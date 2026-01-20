@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Pressable, ScrollView, Text, TouchableOpacity, View, Alert } from 'react-native';
-import { useRouter } from 'expo-router'; // 1. Import router
+import { useRouter } from 'expo-router'; 
 
 interface SidebarProps {
   isOpen: boolean;
@@ -14,7 +14,7 @@ const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
 
 const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) => {
-  const router = useRouter(); // 2. Initialize router
+  const router = useRouter(); 
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -33,7 +33,6 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) =
     ]).start();
   }, [isOpen]);
 
-  // 3. Define the Logout Function
   const handleLogout = () => {
     Alert.alert(
       "Logout",
@@ -44,8 +43,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) =
           text: "Logout", 
           style: "destructive", 
           onPress: () => {
-            onClose(); // Close sidebar first
-            // Replace with your actual login route (e.g., "/login" or "/")
+            onClose();
             router.replace("/"); 
           } 
         }
@@ -53,12 +51,13 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) =
     );
   };
 
+  // UPDATED: Paths mapped exactly to your folder structure shown in the image
   const menuItems = [
-    { name: 'Dashboard', icon: 'grid' },
-    { name: 'Map', icon: 'map' },
-    { name: 'Alerts', icon: 'alert-triangle' },
-    { name: 'SOS', icon: 'rss' },
-    { name: 'Settings', icon: 'settings' },
+    { name: 'Dashboard', icon: 'grid', path: '/drawer/dashboard' },
+    { name: 'Map', icon: 'map', path: '/drawer/LiveMap' }, 
+    { name: 'Alerts', icon: 'alert-triangle', path: '/drawer/AlertPath' },
+    { name: 'SOS', icon: 'rss', path: '/drawer/sospath' }, // Matches app/drawer/sospath
+    { name: 'Settings', icon: 'settings', path: '/drawer/settingPath' }, // Matches app/drawer/settingPath
   ];
 
   return (
@@ -87,6 +86,11 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) =
                 onPress={() => {
                   onNavigate(item.name);
                   onClose();
+                  
+                  // This triggers the folder-based navigation in Expo Router
+                  if (item.path) {
+                    router.push(item.path as any);
+                  }
                 }}
                 className={`flex-row items-center p-4 rounded-xl mb-2 ${isActive ? 'bg-blue-50' : ''}`}
               >
@@ -103,7 +107,6 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) =
           })}
         </ScrollView>
 
-        {/* 4. Connected the handleLogout function here */}
         <TouchableOpacity 
           onPress={handleLogout}
           className="flex-row items-center p-6 border-t border-gray-100 mb-5"

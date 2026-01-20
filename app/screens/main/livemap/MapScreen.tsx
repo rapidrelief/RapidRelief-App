@@ -1,37 +1,44 @@
-import React, { useState } from 'react';
-import { View, ScrollView } from 'react-native';
-import Navbar from '../dashboard/Navbar';
-import Sidebar from '../dashboard/Sidebar';
+import React, { memo, useCallback, useState } from "react";
+import { ScrollView, View } from "react-native";
+import Navbar from "../dashboard/Navbar";
+import Sidebar from "../dashboard/Sidebar";
 
-// Import your new separate components
-import MapHeader from './MapHeader';
-import MapCard from './MapCard'; // This is your 'Map.tsx'
-import MapLegend from './MapLegend';
+// 1. Import your separate files exactly as they are named
+import MapCard from "./MapCard";
+import MapHeader from "./MapHeader";
+import MapLegend from "./MapLegend";
 
 const MapScreen = ({ onNavigate }: { onNavigate: (name: string) => void }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Use callback to prevent unnecessary re-renders of the Navbar
+  const handleToggleMenu = useCallback((state: boolean) => {
+    setIsMenuOpen(state);
+  }, []);
+
   return (
     <View className="flex-1 bg-white">
-      <Navbar onMenuPress={() => setIsMenuOpen(true)} />
+      {/* Navbar stays sticky at the top */}
+      <Navbar onMenuPress={() => handleToggleMenu(true)} />
 
-      <ScrollView 
-        className="flex-1" 
-        contentContainerStyle={{ paddingTop: 110, paddingBottom: 30 }}
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingTop: 110, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-5">
+        {/* responsiveness: max-w limits width on tablets, self-center keeps it middle */}
+        <View className="px-5 w-full max-w-[600px] self-center">
           <MapHeader />
-          
+
           <MapCard />
-          
+
           <MapLegend />
         </View>
       </ScrollView>
 
-      <Sidebar 
-        isOpen={isMenuOpen} 
-        onClose={() => setIsMenuOpen(false)} 
+      <Sidebar
+        isOpen={isMenuOpen}
+        onClose={() => handleToggleMenu(false)}
         onNavigate={onNavigate}
         currentScreen="Map"
       />
@@ -39,4 +46,4 @@ const MapScreen = ({ onNavigate }: { onNavigate: (name: string) => void }) => {
   );
 };
 
-export default MapScreen;
+export default memo(MapScreen);

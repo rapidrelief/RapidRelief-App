@@ -1,8 +1,8 @@
+import React, { useState, memo, useMemo } from 'react';
+import { Platform, StatusBar, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react'; // Added useState
-import { Platform, StatusBar, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
-import ProfileDropdown from '../../../drawer/Profilepath/ProfileDropdown'; // Import the dropdown component
+import ProfileDropdown from '../../../drawer/Profilepath/ProfileDropdown';
 
 interface NavbarProps {
   onMenuPress: () => void;
@@ -10,21 +10,24 @@ interface NavbarProps {
 
 const Navbar = ({ onMenuPress }: NavbarProps) => {
   const router = useRouter();
-  const [showProfile, setShowProfile] = useState(false); // State to toggle dropdown
-  const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight : 44; 
+  const [showProfile, setShowProfile] = useState(false);
+  
+  // Memoize status bar height calculation
+  const topPadding = useMemo(() => 
+    Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 44
+  , []);
 
   return (
     <>
-      {/* 1. STICKY NAVBAR CONTAINER */}
       <View 
-        style={{ top: 0 }} 
-        className="absolute left-0 right-0 z-50 bg-white border-b border-gray-100 shadow-sm"
+        className="absolute top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 shadow-sm"
       >
-        <View style={{ height: statusBarHeight }} />
+        <View style={{ height: topPadding }} />
 
         <View className="flex-row items-center justify-between px-5 h-16">
+          {/* Left: Menu & Logo */}
           <View className="flex-row items-center">
-            <TouchableOpacity onPress={onMenuPress} className="p-1 mr-3">
+            <TouchableOpacity onPress={onMenuPress} hitSlop={15} className="p-1 mr-3">
               <Feather name="menu" size={24} color="#4B5563" />
             </TouchableOpacity>
 
@@ -33,17 +36,17 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
             </View>
           </View>
 
+          {/* Right: Actions */}
           <View className="flex-row items-center">
-            {/* Notification Icon */}
             <TouchableOpacity 
               onPress={() => router.push('/screens/main/dashboard/Notification/NotificationScreen')}
               className="mr-4 relative p-1"
+              hitSlop={10}
             >
               <Ionicons name="notifications-outline" size={24} color="#4B5563" />
-              <View className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+              <View className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
             </TouchableOpacity>
             
-            {/* 2. PROFILE ICON (Triggers Dropdown) */}
             <TouchableOpacity 
               onPress={() => setShowProfile(!showProfile)} 
               className={`p-1 rounded-full ${showProfile ? 'bg-blue-50' : ''}`}
@@ -54,14 +57,11 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
         </View>
       </View>
 
-      {/* 3. DROPDOWN OVERLAY & MENU */}
       {showProfile && (
         <>
-          {/* Transparent backdrop to catch clicks outside the menu to close it */}
           <TouchableWithoutFeedback onPress={() => setShowProfile(false)}>
-            <View className="absolute inset-0 z-[90] h-[2000px] w-full" />
+            <View className="absolute inset-0 z-[90] bg-transparent w-full h-full" />
           </TouchableWithoutFeedback>
-          
           <ProfileDropdown isVisible={showProfile} onClose={() => setShowProfile(false)} />
         </>
       )}
@@ -69,4 +69,4 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
   );
 };
 
-export default Navbar;
+export default memo(Navbar);
