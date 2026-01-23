@@ -5,7 +5,7 @@ import HomeScreen from './screens/Home'; // points to screens/Home/index.tsx
 
 export default function Index() {
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-[#F8FAFC]">
       <HomeScreen />
     </SafeAreaView>
   );

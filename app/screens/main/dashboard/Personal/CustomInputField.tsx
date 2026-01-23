@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TextInput } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TextInput, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 interface InputProps {
@@ -7,23 +7,39 @@ interface InputProps {
   value: string;
   icon: any;
   required?: boolean;
-  editable?: boolean; // New prop
+  editable?: boolean;
 }
 
-const CustomInputField = ({ label, value, icon, required, editable }: InputProps) => (
-  <View className="mb-5">
-    <Text className="text-[#1E293B] font-bold text-sm mb-2 ml-1">
-      {label} {required && <Text className="text-red-500">*</Text>}
-    </Text>
-    <View className={`flex-row items-center px-4 py-4 rounded-2xl border ${editable ? 'bg-white border-[#2563EB]' : 'bg-[#F8FAFC] border-[#F1F5F9]'}`}>
-      <Feather name={icon} size={18} color={editable ? "#2563EB" : "#94A3B8"} />
-      <TextInput 
-        defaultValue={value} 
-        editable={editable}
-        className={`flex-1 ml-3 font-medium ${editable ? 'text-[#1E293B]' : 'text-[#64748B]'}`} 
-      />
-    </View>
-  </View>
-);
+const CustomInputField = ({ label, value, icon, required, editable }: InputProps) => {
+  const { width } = useWindowDimensions();
 
-export default CustomInputField;
+  const res = useMemo(() => ({
+    labelSize: Math.min(width * 0.035, 14),
+    inputText: Math.min(width * 0.038, 15),
+    paddingY: width * 0.04,
+  }), [width]);
+
+  return (
+    <View className="mb-5">
+      <Text style={{ fontSize: res.labelSize }} className="text-[#1E293B] font-bold mb-2 ml-1">
+        {label} {required && <Text className="text-red-500">*</Text>}
+      </Text>
+      <View 
+        style={{ paddingVertical: res.paddingY }}
+        className={`flex-row items-center px-4 rounded-2xl border ${
+          editable ? 'bg-white border-[#2563EB]' : 'bg-[#F8FAFC] border-[#F1F5F9]'
+        }`}
+      >
+        <Feather name={icon} size={18} color={editable ? "#2563EB" : "#94A3B8"} />
+        <TextInput 
+          defaultValue={value} 
+          editable={editable}
+          style={{ fontSize: res.inputText }}
+          className={`flex-1 ml-3 font-medium ${editable ? 'text-[#1E293B]' : 'text-[#64748B]'}`} 
+        />
+      </View>
+    </View>
+  );
+};
+
+export default React.memo(CustomInputField);

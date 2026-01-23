@@ -1,71 +1,95 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
+import React, { useMemo } from "react";
+import { 
+  Text, 
+  TouchableOpacity, 
+  View, 
+  useWindowDimensions, 
+  SafeAreaView, 
+  KeyboardAvoidingView, 
+  Platform, 
+  ScrollView 
+} from "react-native";
 import Button from "../../components/Button";
 import FormInput from "../../components/FormInput";
 
-interface ResetProps {
-  navigation: {
-    goBack: () => void;
-    navigate: (screen: string) => void;
-  };
-}
-
-const Reset: React.FC<ResetProps> = ({ navigation }) => {
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const { width, height } = useWindowDimensions();
-
-  const canSendOTP = phoneNumber.trim().length >= 10;
+const Reset = ({ navigation, onNext, phoneNumber, setPhoneNumber }: any) => {
+  const { height, width } = useWindowDimensions();
+  
+  const res = useMemo(() => ({
+    titleSize: Math.min(width * 0.08, 32),
+    subtitleSize: Math.min(width * 0.04, 16),
+    topMargin: height * 0.02,
+    contentGap: height * 0.04,
+    containerPaddingBottom: height * 0.05, 
+  }), [width, height]);
 
   return (
-    <View style={{ paddingHorizontal: width * 0.08, paddingBottom: height * 0.05 }}>
-      {/* Back Button - Responsive Scaling */}
-      <TouchableOpacity 
-        onPress={() => navigation.goBack()} 
-        style={{ 
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          marginBottom: height * 0.02,
-          marginTop: height * 0.01 
-        }}
-        hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+    <SafeAreaView className="flex-1 bg-transparent">
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
       >
-        <Ionicons name="arrow-back" size={width * 0.06} color="white" />
-        <Text style={{ fontSize: width * 0.04, color: 'white', marginLeft: 8 }}>Back</Text>
-      </TouchableOpacity>
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <View 
+            style={{ paddingBottom: res.containerPaddingBottom }} 
+            className="flex-1 px-8"
+          >
+            <View style={{ marginTop: res.topMargin }} className="flex-1">
+              {/* Back Button */}
+              <TouchableOpacity 
+                onPress={() => navigation.goBack()} 
+                className="flex-row items-center mb-6 py-2 active:opacity-60"
+              >
+                <Ionicons name="arrow-back" size={24} color="white" />
+                <Text className="text-white text-base ml-2 font-medium">Back</Text>
+              </TouchableOpacity>
 
-      {/* Header Text */}
-      <Text style={{ fontSize: width * 0.08, color: 'white', fontWeight: 'bold' }}>
-        Reset Password
-      </Text>
-      <Text style={{ 
-        fontSize: width * 0.038, 
-        color: 'rgba(255,255,255,0.8)', 
-        marginBottom: height * 0.03,
-        marginTop: height * 0.01
-      }}>
-        Enter your phone number to receive OTP
-      </Text>
+              {/* Text Content */}
+              <View style={{ marginBottom: res.contentGap }}>
+                <Text 
+                  style={{ fontSize: res.titleSize, lineHeight: res.titleSize * 1.2 }} 
+                  className="text-white font-bold tracking-tight"
+                >
+                  Reset Password
+                </Text>
+                <Text 
+                  style={{ fontSize: res.subtitleSize }}
+                  className="text-white/70 mt-2 leading-6"
+                >
+                  Enter your phone number to receive OTP
+                </Text>
+              </View>
+              
+              {/* Input Section */}
+              <View className="w-full">
+                <FormInput
+                  label="Phone Number"
+                  placeholder="+92 300 1234567"
+                  iconName="call"
+                  keyboardType="phone-pad"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                />
+              </View>
+            </View>
 
-      {/* Input Component - Now perfectly visible */}
-      <FormInput
-        label="Phone Number"
-        placeholder="+92 300 1234567"
-        iconName="call-outline"
-        keyboardType="phone-pad"
-        value={phoneNumber}
-        onChangeText={setPhoneNumber}
-      />
-
-      {/* Button */}
-      <View style={{ alignItems: 'center', marginTop: height * 0.03 }}>
-        <Button 
-          title="Send OTP" 
-          onPress={() => console.log("OTP Sent")} 
-          disabled={!canSendOTP} 
-        />
-      </View>
-    </View>
+            {/* ACTION AREA */}
+            <View className="items-center mt-8 mb-4"> 
+              <Button 
+                title="Send OTP" 
+                onPress={onNext} // Standard prop from your Button.tsx
+                disabled={phoneNumber.length < 10} 
+              />
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
