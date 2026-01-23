@@ -1,18 +1,22 @@
-import React, { useState } from 'react';
+import React from 'react'; // Removed useState
 import { View, ScrollView, Text } from 'react-native';
 import Navbar from '../dashboard/Navbar';
-import Sidebar from '../dashboard/Sidebar';
+// Removed Sidebar import as it's now global in _layout.tsx
 import ProfileInfo from './ProfileInfo';
 import EmergencyContacts from './EmergencyContacts';
 import DangerZone from './DangerZone';
 import NotificationSettings from './NotificationSettings';
 import PrivacySecurity from './PrivacySecurity';
-const SettingsScreen = ({ onNavigate }: { onNavigate: (name: string) => void }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+// FIXED: Made onNavigate optional (?) to prevent the undefined error
+const SettingsScreen = ({ onNavigate }: { onNavigate?: (name: string) => void }) => {
+  
   return (
     <View className="flex-1 bg-white">
-      <Navbar onMenuPress={() => setIsMenuOpen(true)} />
+      {/* FIXED: Removed onMenuPress prop. 
+         Your new Navbar uses useNavigation() to open the global Drawer.
+      */}
+      <Navbar /> 
       
       <ScrollView 
         className="flex-1 px-5" 
@@ -29,12 +33,10 @@ const SettingsScreen = ({ onNavigate }: { onNavigate: (name: string) => void }) 
         <DangerZone />
       </ScrollView>
 
-      <Sidebar 
-        isOpen={isMenuOpen} 
-        onClose={() => setIsMenuOpen(false)} 
-        onNavigate={onNavigate}
-        currentScreen="Settings" 
-      />
+      {/* FIXED: Removed the local <Sidebar />. 
+         The sidebar is now rendered by app/drawer/_layout.tsx. 
+         Keeping this here causes the "Babel construct" and "duplicate key" errors.
+      */}
     </View>
   );
 };

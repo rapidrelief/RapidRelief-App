@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React from 'react'; // Removed useState
 import { View, ScrollView, Text } from 'react-native';
 import Navbar from '../dashboard/Navbar';
-import Sidebar from '../dashboard/Sidebar';
+// Removed Sidebar import - it's now handled by the drawer layout
 import AlertStats from './AlertStats';
 import AlertItem from './AlertItem';
 import StayInformed from './StayInformed';
 
-const AlertsScreen = ({ onNavigate }: { onNavigate: (name: string) => void }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+// FIXED: Made onNavigate optional (?) to prevent TypeScript errors 
+// when called from your simplified app/drawer/AlertPath/index.tsx
+const AlertsScreen = ({ onNavigate }: { onNavigate?: (name: string) => void }) => {
+  
+  // REMOVED: isMenuOpen state. 
+  // The global drawer in _layout.tsx handles its own state.
 
   const alertsData = [
     { title: "Heavy Rainfall Warning", location: "Gulberg, Lahore", time: "5m ago", level: "High", description: "Heavy rainfall expected in the next 2 hours. Water level rising." },
@@ -17,7 +21,10 @@ const AlertsScreen = ({ onNavigate }: { onNavigate: (name: string) => void }) =>
 
   return (
     <View className="flex-1 bg-white">
-      <Navbar onMenuPress={() => setIsMenuOpen(true)} />
+      {/* FIXED: Removed onMenuPress. 
+          Your new Navbar uses useNavigation() to open the drawer. 
+      */}
+      <Navbar /> 
       
       <ScrollView 
         className="flex-1 px-5" 
@@ -36,12 +43,9 @@ const AlertsScreen = ({ onNavigate }: { onNavigate: (name: string) => void }) =>
         <StayInformed />
       </ScrollView>
 
-      <Sidebar 
-        isOpen={isMenuOpen} 
-        onClose={() => setIsMenuOpen(false)} 
-        onNavigate={onNavigate}
-        currentScreen="Alerts" 
-      />
+      {/* FIXED: Removed the local <Sidebar /> component. 
+          The Sidebar is now rendered once by app/drawer/_layout.tsx.
+      */}
     </View>
   );
 };

@@ -1,7 +1,16 @@
 import { Feather } from '@expo/vector-icons';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Dimensions, Pressable, ScrollView, Text, TouchableOpacity, View, Alert } from 'react-native';
-import { useRouter } from 'expo-router'; 
+import {
+  Animated,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  Alert,
+} from 'react-native';
+import { useRouter } from 'expo-router';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -14,7 +23,8 @@ const { width } = Dimensions.get('window');
 const SIDEBAR_WIDTH = width * 0.75;
 
 const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) => {
-  const router = useRouter(); 
+  const router = useRouter();
+
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -39,35 +49,43 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) =
       "Are you sure you want to logout from Rapid Relief?",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Logout", 
-          style: "destructive", 
+        {
+          text: "Logout",
+          style: "destructive",
           onPress: () => {
             onClose();
-            router.replace("/"); 
-          } 
-        }
+            router.replace("/");
+          },
+        },
       ]
     );
   };
 
-  // UPDATED: Paths mapped exactly to your folder structure shown in the image
   const menuItems = [
     { name: 'Dashboard', icon: 'grid', path: '/drawer/dashboard' },
-    { name: 'Map', icon: 'map', path: '/drawer/LiveMap' }, 
+    { name: 'Map', icon: 'map', path: '/drawer/LiveMap' },
     { name: 'Alerts', icon: 'alert-triangle', path: '/drawer/AlertPath' },
-    { name: 'SOS', icon: 'rss', path: '/drawer/sospath' }, // Matches app/drawer/sospath
-    { name: 'Settings', icon: 'settings', path: '/drawer/settingPath' }, // Matches app/drawer/settingPath
+    { name: 'SOS', icon: 'rss', path: '/drawer/sospath' },
+    { name: 'Settings', icon: 'settings', path: '/drawer/settingPath' },
   ];
 
   return (
-    <View className="absolute inset-0 z-[100] flex-row" pointerEvents={isOpen ? 'auto' : 'none'}>
-      <Animated.View style={{ opacity: fadeAnim }} className="absolute inset-0 bg-black/40">
+    <View
+      className="absolute inset-0 z-[100] flex-row"
+      pointerEvents={isOpen ? 'auto' : 'none'}
+    >
+      <Animated.View
+        style={{ opacity: fadeAnim }}
+        className="absolute inset-0 bg-black/40"
+      >
         <Pressable className="flex-1" onPress={onClose} />
       </Animated.View>
 
-      <Animated.View 
-        style={{ transform: [{ translateX: slideAnim }], width: SIDEBAR_WIDTH }}
+      <Animated.View
+        style={{
+          transform: [{ translateX: slideAnim }],
+          width: SIDEBAR_WIDTH,
+        }}
         className="bg-white h-full pt-12 shadow-2xl"
       >
         <View className="flex-row items-center justify-between px-6 mb-8">
@@ -80,26 +98,29 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) =
         <ScrollView className="px-4">
           {menuItems.map((item, index) => {
             const isActive = currentScreen === item.name;
+
             return (
-              <TouchableOpacity 
+              <TouchableOpacity
                 key={index}
                 onPress={() => {
                   onNavigate(item.name);
                   onClose();
-                  
-                  // This triggers the folder-based navigation in Expo Router
-                  if (item.path) {
-                    router.push(item.path as any);
-                  }
+                  router.push(item.path as any);
                 }}
-                className={`flex-row items-center p-4 rounded-xl mb-2 ${isActive ? 'bg-blue-50' : ''}`}
+                className={`flex-row items-center p-4 rounded-xl mb-2 ${
+                  isActive ? 'bg-blue-50' : ''
+                }`}
               >
-                <Feather 
-                  name={item.icon as any} 
-                  size={20} 
-                  color={isActive ? '#2563EB' : '#6B7280'} 
+                <Feather
+                  name={item.icon as any}
+                  size={20}
+                  color={isActive ? '#2563EB' : '#6B7280'}
                 />
-                <Text className={`ml-4 text-base ${isActive ? 'text-blue-600 font-semibold' : 'text-gray-600'}`}>
+                <Text
+                  className={`ml-4 text-base ${
+                    isActive ? 'text-blue-600 font-semibold' : 'text-gray-600'
+                  }`}
+                >
                   {item.name}
                 </Text>
               </TouchableOpacity>
@@ -107,7 +128,7 @@ const Sidebar = ({ isOpen, onClose, onNavigate, currentScreen }: SidebarProps) =
           })}
         </ScrollView>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleLogout}
           className="flex-row items-center p-6 border-t border-gray-100 mb-5"
         >

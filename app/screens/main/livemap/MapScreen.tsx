@@ -1,47 +1,41 @@
-import React, { memo, useCallback, useState } from "react";
+import React, { memo } from "react";
 import { ScrollView, View } from "react-native";
 import Navbar from "../dashboard/Navbar";
-import Sidebar from "../dashboard/Sidebar";
+// REMOVED: Sidebar import (now handled by _layout.tsx)
 
-// 1. Import your separate files exactly as they are named
 import MapCard from "./MapCard";
 import MapHeader from "./MapHeader";
 import MapLegend from "./MapLegend";
 
-const MapScreen = ({ onNavigate }: { onNavigate: (name: string) => void }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  // Use callback to prevent unnecessary re-renders of the Navbar
-  const handleToggleMenu = useCallback((state: boolean) => {
-    setIsMenuOpen(state);
-  }, []);
+// FIXED: Made onNavigate optional (?) so TypeScript doesn't complain
+const MapScreen = ({ onNavigate }: { onNavigate?: (name: string) => void }) => {
+  
+  // REMOVED: isMenuOpen state and handleToggleMenu. 
+  // The global drawer manages its own open/close state.
 
   return (
     <View className="flex-1 bg-white">
-      {/* Navbar stays sticky at the top */}
-      <Navbar onMenuPress={() => handleToggleMenu(true)} />
+      {/* FIXED: Removed onMenuPress prop. 
+         Your updated Navbar now calls navigation.openDrawer() directly.
+      */}
+      <Navbar />
 
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingTop: 110, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* responsiveness: max-w limits width on tablets, self-center keeps it middle */}
         <View className="px-5 w-full max-w-[600px] self-center">
           <MapHeader />
-
           <MapCard />
-
           <MapLegend />
         </View>
       </ScrollView>
 
-      <Sidebar
-        isOpen={isMenuOpen}
-        onClose={() => handleToggleMenu(false)}
-        onNavigate={onNavigate}
-        currentScreen="Map"
-      />
+      {/* FIXED: Removed the local <Sidebar />. 
+         If you keep this here, you get a "Babel construct" crash because 
+         you have two sidebars fighting for control.
+      */}
     </View>
   );
 };
