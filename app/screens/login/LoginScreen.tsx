@@ -4,6 +4,8 @@ import Header from '@/app/screens/Home/Header';
 import HeroImage from '@/app/screens/Home/HeroImage';
 import WelcomeText from '@/app/screens/Home/WelcomeText';
 import LogF from './LoginF';
+// 1. Import your BackButton
+import BackButton from '@/app/components/BackButton'; 
 
 const LoginScreen = () => {
   const { height } = useWindowDimensions();
@@ -11,6 +13,10 @@ const LoginScreen = () => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#1A4BCC' }}>
       <StatusBar barStyle="light-content" />
+      
+      {/* 2. Place it here. Because it is absolute, it stays on top. */}
+      <BackButton />
+
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -19,7 +25,6 @@ const LoginScreen = () => {
           className="flex-1" 
           contentContainerStyle={{ 
             flexGrow: 1, 
-            // INCREASED: This ensures the button is pushed above the nav bar
             paddingBottom: Platform.OS === 'android' ? 40 : 20 
           }}
           showsVerticalScrollIndicator={false}
@@ -30,7 +35,6 @@ const LoginScreen = () => {
           <WelcomeText title="Welcome Back" subtitle="Sign in to continue" />
           <LogF />
           
-          {/* Optional: Extra spacer for very small screens */}
           <View style={{ height: 10 }} />
         </ScrollView>
       </KeyboardAvoidingView>

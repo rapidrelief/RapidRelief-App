@@ -8,21 +8,22 @@
     "scheme": "floodrelief",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-
+    "splash": {
+      "image": "./assets/images/boat3.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2563EB"
+    },
     "android": {
-      "edgeToEdgeEnabled": false,
-
+      "edgeToEdgeEnabled": true,
       "statusBar": {
-        "backgroundColor": "#F8FAFC",
-        "barStyle": "dark-content"
+        "backgroundColor": "#2563EB",
+        "barStyle": "light-content"
       },
-
       "navigationBar": {
-        "backgroundColor": "#F8FAFC",
-        "barStyle": "dark-content"
+        "backgroundColor": "#2563EB",
+        "barStyle": "light-content"
       }
     },
-
     "plugins": ["expo-router"]
   }
 }
