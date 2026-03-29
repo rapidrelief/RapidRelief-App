@@ -4,14 +4,12 @@ import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Navbar from "../Navbar";
-import Sidebar from "../Sidebar"; // <-- import your custom Sidebar
 import NotificationCard from "./NotificationCard";
 import NotificationToggle from "./NotificationToggle";
 
 const NotificationScreen = () => {
   const insets = useSafeAreaInsets();
 
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // control sidebar
 
   const [settings, setSettings] = useState({
     all: true,
@@ -21,23 +19,14 @@ const NotificationScreen = () => {
   });
 
   // Function called when sidebar item is pressed
-  const handleNavigate = (screenName: string) => {
-    console.log("Navigate to:", screenName);
-    setIsSidebarOpen(false); // close sidebar after navigating
-  };
-
+  
   return (
     <View className="flex-1 bg-[#F8FAFC]">
       {/* Sidebar overlay */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        onNavigate={handleNavigate}
-        currentScreen="Alerts" // or dynamically pass current screen
-      />
+      
 
       {/* Pass toggle to Navbar */}
-      <Navbar onMenuPress={() => setIsSidebarOpen(true)} />
+      <Navbar  />
 
       {/* --- KEEP THE REST OF YOUR UI UNCHANGED --- */}
       <ScrollView

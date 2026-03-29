@@ -1,139 +1,110 @@
 import React, { useState, useMemo } from 'react'; 
-import { 
-  ScrollView, View, Text, TouchableOpacity, 
-  useWindowDimensions, Platform, KeyboardAvoidingView 
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// Internal Components
+import { ScrollView, View, Text, TouchableOpacity, SafeAreaView, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import Navbar from '../Navbar'; 
-import Sidebar from '../Sidebar'; 
 import ProfileHeader from './ProfileHeader';
 import InfoStatsCard from './InfoStatsCard';
 import CustomInputField from './CustomInputField';
 import AccountInfo from './AccountInfo';
-import PrivacyModal from './_PrivacyModal';
-import DeleteModal from './_DeleteModal';
+import { userData } from '@/app/store/user';
 
 const PersonalScreen = () => {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { width } = useWindowDimensions();
-  
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [modalMode, setModalMode] = useState<'password' | 'privacy' | 'delete' | null>(null);
 
-  const res = useMemo(() => {
-    const scale = width / 375;
-    const ms = (size: number, factor = 0.5) => size + (scale * size - size) * factor;
+  // Responsive Text Scaling
+  const res = useMemo(() => ({
+    titleSize: Math.min(width * 0.045, 18),
+    textSize: Math.min(width * 0.035, 14),
+  }), [width]);
 
-    return {
-      titleSize: ms(20),
-      textSize: ms(15),
-      padding: width * 0.06,
-      spacing: ms(16),
-      cardRadius: ms(32),
-      isTablet: width > 768,
-    };
-  }, [width]);
+  
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFC]" edges={['top', 'left', 'right']}>
-      <Sidebar 
-        isOpen={isMenuOpen} 
-        onClose={() => setIsMenuOpen(false)} 
-        currentScreen="Settings" 
-        onNavigate={() => setIsMenuOpen(false)} 
-      />
+    <SafeAreaView className="flex-1 bg-[#F8FAFC]">
 
-      <Navbar onMenuPress={() => setIsMenuOpen(true)} />
+      <Navbar />
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <ScrollView 
         className="flex-1"
+        contentContainerStyle={{ 
+          paddingTop: insets.top + 60, 
+          paddingBottom: insets.bottom + 20 
+        }}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView 
-          className="flex-1"
-          contentContainerStyle={{ 
-            paddingTop: Platform.OS === 'ios' ? 70 : 90, 
-            paddingBottom: insets.bottom + 40 
-          }}
-          showsVerticalScrollIndicator={false}
-        >
-          <View className="w-full self-center" style={{ maxWidth: res.isTablet ? 600 : '100%' }}>
-            
-            <ProfileHeader isEditing={isEditing} setIsEditing={setIsEditing} />
-            
-            <View style={{ marginBottom: res.spacing }}>
-              <InfoStatsCard isEditing={isEditing} />
-            </View>
+        <View className="w-full">
+          <ProfileHeader isEditing={isEditing} setIsEditing={setIsEditing} />
+          
+          <InfoStatsCard isEditing={isEditing} />
 
-            <View style={{ paddingHorizontal: res.padding }} className="mb-8">
-              <Text style={{ fontSize: res.titleSize }} className="font-black text-[#0F172A] mb-4">
-                Contact Information
-              </Text>
-              <View style={{ gap: res.spacing / 2 }}>
-                <CustomInputField label="Full Name" value="John Doe" icon="user" editable={isEditing} />
-                <CustomInputField label="Email Address" value="john.doe@example.com" icon="mail" editable={isEditing} />
-                <CustomInputField label="Phone" value="+92 300 1234567" icon="phone" editable={isEditing} />
-              </View>
-            </View>
-
-            <AccountInfo />
-
-            <View 
-              style={{ 
-                marginHorizontal: res.padding, 
-                padding: res.padding,
-                borderRadius: res.cardRadius,
-                marginTop: res.spacing
-              }} 
-              className="bg-white border border-slate-100 shadow-sm mb-6"
-            >
-              <Text style={{ fontSize: res.titleSize }} className="font-extrabold text-[#1E293B] mb-5">
-                Security & Privacy
-              </Text>
-
-              <View style={{ gap: res.spacing }}> 
-                <TouchableOpacity 
-                  onPress={() => setModalMode('password')}
-                  style={{ paddingVertical: res.spacing }}
-                  className="w-full border border-slate-100 rounded-2xl items-center active:bg-slate-50"
-                >
-                  <Text style={{ fontSize: res.textSize }} className="text-[#1E293B] font-bold">Change Password</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  onPress={() => setModalMode('privacy')}
-                  style={{ paddingVertical: res.spacing }}
-                  className="w-full border border-slate-100 rounded-2xl items-center active:bg-slate-50"
-                >
-                  <Text style={{ fontSize: res.textSize }} className="text-[#1E293B] font-bold">Privacy Settings</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  onPress={() => setModalMode('delete')}
-                  style={{ paddingVertical: res.spacing }}
-                  className="w-full bg-red-50 border border-red-100 rounded-2xl items-center"
-                >
-                  <Text style={{ fontSize: res.textSize }} className="text-red-500 font-bold">Delete Account</Text>
-                </TouchableOpacity>
-              </View>
+          {/* Contact Information */}
+          <View className="px-6 mb-6">
+            <Text style={{ fontSize: res.titleSize }} className="font-extrabold text-[#1E293B] mb-4">
+              Contact Information
+            </Text>
+            <View className="space-y-1">
+              <CustomInputField label="Full Name" value="userData.name" icon="user" editable={false} />
+              <CustomInputField label="Email Address" value="userData.email" icon="mail" editable={false} />
+              <CustomInputField label="Phone Number" value="userData.phone" icon="phone" editable={false} />
+              <CustomInputField label="Emergency Contact" value="userData.emergency_contact" icon="shield" required editable={isEditing} />
             </View>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
 
-      <PrivacyModal 
-        isVisible={modalMode === 'password' || modalMode === 'privacy'} 
-        mode={modalMode === 'delete' ? null : modalMode} 
-        onClose={() => setModalMode(null)} 
-      />
+          {/* Address Details */}
+          <View className="px-6 mb-6">
+            <Text style={{ fontSize: res.titleSize }} className="font-extrabold text-[#1E293B] mb-4">
+              Address Details
+            </Text>
+            <View className="space-y-1">
+              <CustomInputField label="Street Address" value="House 123, Street 45, Gulberg III" icon="map-pin" editable={isEditing} />
+              <CustomInputField label="City" value="Lahore" icon="map" editable={isEditing} />
+              <CustomInputField label="Country" value="Pakistan" icon="globe" editable={false} />
+            </View>
+          </View>
 
-      <DeleteModal 
-        isVisible={modalMode === 'delete'} 
-        onClose={() => setModalMode(null)} 
-      />
+          <AccountInfo />
+
+          {/* Security Section - Tailwind Optimized */}
+          <View className="mx-6 p-5 bg-white border border-[#F1F5F9] rounded-[32px] shadow-sm mb-6">
+            <Text style={{ fontSize: res.titleSize }} className="font-extrabold text-[#1E293B] mb-4">
+              Security & Privacy
+            </Text>
+            
+            <View className="gap-y-2"> 
+              <TouchableOpacity 
+                disabled={isEditing} 
+                className={`w-full py-3.5 border border-[#F1F5F9] rounded-2xl items-center active:bg-slate-50 ${isEditing ? 'opacity-40' : ''}`}
+              >
+                <Text style={{ fontSize: res.textSize }} className="text-[#1E293B] font-bold">
+                  Change Password
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                disabled={isEditing} 
+                className={`w-full py-3.5 border border-[#F1F5F9] rounded-2xl items-center active:bg-slate-50 ${isEditing ? 'opacity-40' : ''}`}
+              >
+                <Text style={{ fontSize: res.textSize }} className="text-[#1E293B] font-bold">
+                  Privacy Settings
+                </Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                disabled={isEditing} 
+                className={`w-full py-3.5 border border-red-100 bg-red-50 rounded-2xl items-center active:bg-red-100 ${isEditing ? 'opacity-40' : ''}`}
+              >
+                <Text style={{ fontSize: res.textSize }} className="text-red-500 font-bold">
+                  Delete Account
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };

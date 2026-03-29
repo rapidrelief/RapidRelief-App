@@ -47,7 +47,7 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
               hitSlop={15}
               className="p-1 mr-3"
             >
-              <Feather name="menu" size={24} color="#4B5563" />
+              <Feather name="menu" size={24} color="#63564b" />
             </TouchableOpacity>
 
             <View className="bg-blue-600 p-2 rounded-xl shadow-md shadow-blue-400">
@@ -57,7 +57,7 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
 
           <View className="flex-row items-center">
             <TouchableOpacity
-              onPress={() => router.push("/screens/main/dashboard/Notification/NotificationScreen")}
+              onPress={() => router.push("/drawer/notification")}
               className="mr-4 relative p-1"
               hitSlop={10}
             >

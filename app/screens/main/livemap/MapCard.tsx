@@ -1,126 +1,177 @@
-import React, { useEffect, useRef, memo } from 'react';
+import React, { useEffect, useRef, memo, useState } from 'react';
 import { View, Text, TouchableOpacity, Animated, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import MapView, {Circle, Marker} from "react-native-maps";
+import { getZonesMap } from '@/app/services/api';
+import * as Location from "expo-location";
 
 const MapCard = () => {
-  // Get screen dimensions for dynamic height adjustment
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const blinkAnim = useRef(new Animated.Value(1)).current;
+  const [zones, setZones] = useState([]);
+  const [region, setRegion] = useState<any>(null);
+  const [moved, setMoved] = useState(false);
+  const mapRef = useRef<MapView | null>(null);
 
   useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(blinkAnim, {
-          toValue: 0.3,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(blinkAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [blinkAnim]);
+    loadZones();
 
-  // Make map height responsive: smaller on short screens, max 450 on large ones
-  const responsiveMapHeight = screenHeight < 700 ? 350 : 450;
+    const interval = setInterval(() => {
+      loadZones();
+    }, 5000);
+    
+    getLocation();
+    
+    return () => clearInterval(interval); 
+  }, []);
 
+  const getLocation = async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") return;
+
+    let location = await Location.getCurrentPositionAsync({});
+    
+    const coords = {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      latitudeDelta: 0.5,
+      longitudeDelta: 0.5,
+    };
+
+    setUserLocation(coords);
+    setRegion(coords);
+  };
+
+  const loadZones = async () => {
+    try {
+      const data = await getZonesMap();
+      setZones(data?.zones || []);
+    } catch (err) {
+      console.log("Zone load failed", err);
+      setZones([]);
+    }
+  };
+
+  const getColor = (state: string) => {
+    if (state === "FLOOD") return "red";
+    if (state === "SOS") return "orange";
+    if (state === "WEAK_SIGNAL") return "yellow";
+    if (state === "NO_SIGNAL") return "red";
+    return "green"; // SAFE
+  };
+  const getFillColor = (state: string) => {
+  const color = getColor(state);
+
+  if (color === "red") return "rgba(255,0,0,0.25)";
+  if (color === "orange") return "rgba(255,165,0,0.25)";
+  if (color === "yellow") return "rgba(255,255,0,0.25)";
+  if (color === "green") return "rgba(0,128,0,0.25)";
+
+  return "rgba(0,0,0,0.1)";
+};
+
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+
+    const goToMyLocation = () => {
+      if (!userLocation || !mapRef.current) return;
+
+      mapRef.current.animateToRegion({
+        ...userLocation,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      }, 1000)
+    }
+    if (!region) return null;
   return (
-    <View className="p-4 border border-slate-100 rounded-[30px] bg-white shadow-sm w-full">
-      
-      {/* 1. Control Bar - Replaced space-x with gap for better responsiveness */}
-      <View className="flex-row justify-between items-center mb-4 px-1">
-        <View className="flex-row gap-2">
-          <TouchableOpacity className="bg-white border border-slate-100 px-4 py-2 rounded-xl flex-row items-center shadow-sm">
-            <Feather name="layers" size={16} color="#1e293b" />
-            <Text className="text-slate-800 font-semibold ml-2 text-xs md:text-sm">Layers</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity className="bg-white border border-slate-100 px-4 py-2 rounded-xl flex-row items-center shadow-sm">
-            <Feather name="navigation" size={16} color="#1e293b" />
-            <Text className="text-slate-800 font-semibold ml-2 text-xs md:text-sm">My Location</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <View className="flex-row gap-2">
-          <TouchableOpacity className="bg-white border border-slate-100 p-2 rounded-xl shadow-sm">
-            <Feather name="search" size={18} color="#1e293b" />
-          </TouchableOpacity>
-          <TouchableOpacity className="bg-white border border-slate-100 p-2 rounded-xl shadow-sm">
-            <Feather name="minus" size={18} color="#1e293b" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* 2. Visual Map Container with Grid */}
-      <View 
-        style={{ height: responsiveMapHeight }}
-        className="bg-[#eef6ff] rounded-[32px] items-center justify-center border border-blue-100 relative overflow-hidden"
+    <View className="h-[400px] rounded-2xl overflow-hidden">
+      <MapView
+      ref={mapRef}
+        style={{ flex: 1 }}
+        region={region}
+        onRegionChangeComplete={() => setMoved(true)}
       >
-        
-        {/* The Grid Pattern Overlay - Slightly reduced length for cleaner rendering */}
-        <View className="absolute inset-0 flex-row flex-wrap justify-between p-2 opacity-10">
-          {Array.from({ length: 24 }).map((_, i) => (
-            <View key={i} className="w-2 h-2 bg-blue-600 rounded-sm m-4" />
-          ))}
-        </View>
+        {zones.map((zone: any) => (
+          <React.Fragment key={zone.id}>
+            <Marker
+              key={zone.id}
+              coordinate={{
+                latitude: zone.lat,
+                longitude: zone.lng,
+              }}
+            
+              title={zone.name}
+              description={zone.state}
+            >
+              <View
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: getColor(zone.state),
+                borderWidth: 2,
+                borderColor: "white",
+                opacity:0,
 
-        {/* 3. Secondary/Background Pin */}
-        <View className="absolute top-[35%] left-[25%] opacity-40">
-           <Feather name="map-pin" size={24} color="#2563eb" />
-        </View>
+              }}
+              />
+            </Marker>
 
-        {/* 4. Main Your Location Marker (Central) */}
-        <View className="items-center z-10">
-          <View className="bg-[#2563eb] px-4 py-1 rounded-md mb-2 shadow-sm">
-            <Text className="text-white text-[10px] md:text-[12px] font-bold">Your Location</Text>
-          </View>
-          
-          <View className="items-center justify-center">
-             <View className="w-16 h-16 md:w-20 md:h-20 bg-blue-500/20 rounded-full absolute" />
-             <View className="w-14 h-14 md:w-16 md:h-16 bg-blue-600 rounded-full items-center justify-center border-4 border-white shadow-xl">
-                <Feather name="map-pin" size={24} color="white" />
-             </View>
-          </View>
-        </View>
+            <Circle
+              center={{
+                latitude: zone.lat,
+                longitude: zone.lng,
+              }}
+              radius={zone.radius_m}
+              strokeColor={getColor(zone.state)}
+              fillColor={getFillColor(zone.state)}
+              strokeWidth={2}
+            />
+          </React.Fragment>
+        ))}
 
-        {/* Text Labels - Added responsive padding */}
-        <View className="mt-4 items-center px-4">
-          <Text className="text-slate-800 font-bold text-lg md:text-xl text-center">Interactive Map View</Text>
-          <Text className="text-slate-500 text-center text-xs md:text-sm mt-1 leading-5">
-            Real-time tracking with nearby safe zones and flood alerts
-          </Text>
-        </View>
-        
-        {/* 5. Live Tracking Status Badge with Animated Dot */}
-        <View className="absolute bottom-8 bg-[#2563eb] px-6 py-3 rounded-2xl flex-row items-center shadow-lg">
-          <Animated.View 
-            style={{ opacity: blinkAnim }}
-            className="w-2.5 h-2.5 rounded-full bg-white mr-3" 
-          />
-          <Text className="text-white font-bold text-xs md:text-sm tracking-wide">
-            Live Tracking Active
-          </Text>
-        </View>
+         {userLocation && (
+              <Marker
+                coordinate={userLocation}
+                title='You'
+                pinColor='blue'
+              >
+                <View
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                backgroundColor: "blue",
+                borderWidth: 2,
+                borderColor: "white",
+              }}
+              />
+              </Marker>
+            )}
+            
+      </MapView>
 
-        {/* Floating Zoom Buttons (Top Right inside Map) */}
-        <View className="absolute top-4 right-4 gap-2">
-           <TouchableOpacity className="bg-white p-2 rounded-xl shadow-md">
-             <Feather name="zoom-in" size={20} color="black" />
-           </TouchableOpacity>
-           <TouchableOpacity className="bg-white p-2 rounded-xl shadow-md">
-             <Feather name="zoom-out" size={20} color="black" />
-           </TouchableOpacity>
-        </View>
-
-      </View>
+      {moved && (
+        <TouchableOpacity
+        onPress={() => {
+          goToMyLocation();
+          setMoved(false);
+        }}
+        style={{
+          position: 'absolute',
+          bottom: 20,
+          right: 20,
+          backgroundColor: 'white',
+          padding: 12,
+          borderRadius: 50,
+          elevation: 5,
+        }}
+        >
+          <Feather name="crosshair" size={20} color="blue" />
+        </TouchableOpacity>
+        )}
     </View>
   );
 };
 
-// Export as memo to prevent parent re-renders from affecting the internal animation
-export default memo(MapCard);
+export default MapCard;
