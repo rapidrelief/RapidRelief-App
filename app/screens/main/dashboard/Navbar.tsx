@@ -1,7 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { DrawerActions } from "@react-navigation/native";
 import { useNavigation, useRouter } from "expo-router";
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useMemo, useState, useEffect } from "react";
 import {
   Platform,
   StatusBar,
@@ -9,6 +9,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { auth, db } from "@/app/config/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
 import ProfileDropdown from "../../../drawer/Profilepath/ProfileDropdown";
 
 // 1. Define the interface so TypeScript knows about onMenuPress
@@ -20,11 +22,30 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
   const router = useRouter();
   const navigation = useNavigation(); 
   const [showProfile, setShowProfile] = useState(false);
+  const [fullName, setFullName] = useState("");
 
   const topPadding = useMemo(
     () => (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 44),
     [],
   );
+
+  useEffect(() => {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    const unsubscribe = onSnapshot(
+      doc(db, "user", user.uid),
+      (snapshot) => {
+        if(snapshot.exists()) {
+          const data = snapshot.data();
+          setFullName(data.fullName || "");
+        }
+      }
+    );
+
+    return unsubscribe;
+  }, []);
 
   // 2. Updated Trigger: Use the prop if it exists, otherwise fallback to local dispatch
   const handleOpenDrawer = () => {
@@ -80,7 +101,7 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
           <TouchableWithoutFeedback onPress={() => setShowProfile(false)}>
             <View className="absolute inset-0 z-[90] bg-transparent" style={{ width: "100%", height: "1000%" }} />
           </TouchableWithoutFeedback>
-          <ProfileDropdown isVisible={showProfile} onClose={() => setShowProfile(false)} />
+          <ProfileDropdown isVisible={showProfile} onClose={() => setShowProfile(false)} fullName={fullName}  />
         </>
       )}
     </>

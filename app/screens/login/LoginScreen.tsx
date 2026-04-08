@@ -15,7 +15,7 @@ const LoginScreen = () => {
       <StatusBar barStyle="light-content" />
       
       {/* 2. Place it here. Because it is absolute, it stays on top. */}
-      <BackButton />
+      {/* <BackButton /> */}
 
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
@@ -31,7 +31,9 @@ const LoginScreen = () => {
           keyboardShouldPersistTaps="handled"
         >
           <Header />
-          <HeroImage />
+          <View style={{ alignItems: 'center', marginBottom: -30, zIndex: 10 }}>
+  <HeroImage />
+</View>
           <WelcomeText title="Welcome Back" subtitle="Sign in to continue" />
           <LogF />
           

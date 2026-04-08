@@ -1,9 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { 
   View, Text, Modal, TouchableOpacity, TextInput, Animated, 
-  Platform, KeyboardAvoidingView, Pressable, Switch, useWindowDimensions 
+  Platform, KeyboardAvoidingView, Pressable, Switch, useWindowDimensions, Alert,
+  ScrollView, TouchableWithoutFeedback, Keyboard 
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+
+import { auth } from "@/app/config/firebase";
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth";
+
 
 interface Props {
   isVisible: boolean;
@@ -44,8 +49,46 @@ const PrivacyModal = ({ isVisible, mode, onClose }: Props) => {
     }
   }, [isVisible, height]);
 
-  const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/.test(passwords.new);
+  const isStrong = passwords.new.length >= 6;
   const canUpdate = passwords.current.length > 0 && isStrong && passwords.new === passwords.confirm;
+
+  const handleUpdatePassword = async () => {
+  try {
+    const user = auth.currentUser;
+
+    if (!user || !user.email) {
+      Alert.alert("Error", "No logged in user found");
+      return;
+    }
+
+    const credential = EmailAuthProvider.credential(
+      user.email,
+      passwords.current
+    );
+
+    await reauthenticateWithCredential(user, credential);
+
+    await updatePassword(user, passwords.new);
+
+    Alert.alert("Success", "Password updated successfully");
+
+    setPasswords({
+      current: "",
+      new: "",
+      confirm: "",
+    });
+
+    onClose();
+  } catch (error: any) {
+    console.log(error);
+
+    if (error.code === "auth/wrong-password") {
+      Alert.alert("Error", "Current password is incorrect");
+    } else {
+      Alert.alert("Error", "Could not update password");
+    }
+  }
+};
 
   return (
     <Modal transparent visible={isVisible} onRequestClose={onClose} animationType="none">
@@ -54,19 +97,30 @@ const PrivacyModal = ({ isVisible, mode, onClose }: Props) => {
           <Animated.View style={{ opacity: fadeAnim, flex: 1, backgroundColor: 'rgba(0,0,0,0.1)' }} />
         </Pressable>
         
-        <Animated.View 
-          style={{ 
-            transform: [{ translateY: slideAnim }], 
-            maxHeight: height * 0.85,
-            paddingBottom: Platform.OS === 'ios' ? 40 : 20 
-          }} 
-          className="bg-white rounded-t-[40px] p-8 shadow-2xl"
-        >
           <KeyboardAvoidingView 
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={20}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+            style={{ justifyContent: "flex-end" }}
           >
-            <View className="flex-row justify-between items-center mb-6">
+          <Animated.View 
+            style={{ 
+              transform: [{ translateY: slideAnim }], 
+              maxHeight: mode === 'password' ? height * 0.72 : height * 0.4,
+              minHeight: mode === 'password' ? height * 0.55 : height * 0.3,
+              paddingBottom: Platform.OS === 'ios' ? 30 : 20 
+          }} 
+          className="bg-white rounded-t-[40px] p-8 shadow-2xl"
+          >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+                contentContainerStyle={{
+                  paddingBottom: 50,
+                }}
+              >
+                <View className="flex-row justify-between items-center mb-6">
               <Text style={{ fontSize: ms(22) }} className="font-bold text-slate-800">
                 {mode === 'password' ? 'Security' : 'Privacy Settings'}
               </Text>
@@ -96,7 +150,8 @@ const PrivacyModal = ({ isVisible, mode, onClose }: Props) => {
                     secureTextEntry={!showCurrent}
                     style={{ height: ms(55), fontSize: ms(14) }}
                     className="bg-slate-50 pl-5 pr-12 rounded-2xl border border-slate-100 text-slate-800" 
-                    placeholder="Current Password" 
+                    placeholder="Current Password"
+                    placeholderTextColor="#c0c7d1ec" 
                     value={passwords.current} 
                     onChangeText={(t) => setPasswords({...passwords, current: t})} 
                   />
@@ -114,7 +169,8 @@ const PrivacyModal = ({ isVisible, mode, onClose }: Props) => {
                     secureTextEntry={!showNew}
                     style={{ height: ms(55), fontSize: ms(14) }}
                     className="bg-slate-50 pl-5 pr-12 rounded-2xl border border-slate-100 text-slate-800" 
-                    placeholder="New Password" 
+                    placeholder="New Password"
+                    placeholderTextColor="#c0c7d1ec" 
                     value={passwords.new} 
                     onChangeText={(t) => setPasswords({...passwords, new: t})} 
                   />
@@ -126,7 +182,7 @@ const PrivacyModal = ({ isVisible, mode, onClose }: Props) => {
                   </TouchableOpacity>
                   {passwords.new.length > 0 && !isStrong && (
                     <Text style={{ fontSize: ms(10) }} className="text-red-400 mt-2 ml-2 font-medium">
-                      Requires 8+ chars, 1 Uppercase & 1 Symbol
+                      Password must be at least 6 characters
                     </Text>
                   )}
                 </View>
@@ -137,7 +193,8 @@ const PrivacyModal = ({ isVisible, mode, onClose }: Props) => {
                     secureTextEntry={!showConfirm}
                     style={{ height: ms(55), fontSize: ms(14) }}
                     className="bg-slate-50 pl-5 pr-12 rounded-2xl border border-slate-100 text-slate-800" 
-                    placeholder="Confirm New Password" 
+                    placeholder="Confirm New Password"
+                    placeholderTextColor="#f288758f" 
                     value={passwords.confirm} 
                     onChangeText={(t) => setPasswords({...passwords, confirm: t})} 
                   />
@@ -150,6 +207,7 @@ const PrivacyModal = ({ isVisible, mode, onClose }: Props) => {
                 </View>
 
                 <TouchableOpacity 
+                  onPress={handleUpdatePassword}
                   disabled={!canUpdate} 
                   style={{ height: ms(55) }}
                   className={`rounded-2xl items-center justify-center mt-4 shadow-sm ${canUpdate ? "bg-blue-600" : "bg-slate-200"}`}
@@ -160,8 +218,12 @@ const PrivacyModal = ({ isVisible, mode, onClose }: Props) => {
                 </TouchableOpacity>
               </View>
             )}
-          </KeyboardAvoidingView>
+
+              </ScrollView>
+            
+            </TouchableWithoutFeedback>
         </Animated.View>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );

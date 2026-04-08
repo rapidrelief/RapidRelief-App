@@ -1,14 +1,15 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface ProfileDropdownProps {
   isVisible: boolean;
   onClose: () => void;
+  fullName?: string;
 }
 
-const ProfileDropdown = ({ isVisible, onClose }: ProfileDropdownProps) => {
+const ProfileDropdown = ({ isVisible, onClose, fullName = "" }: ProfileDropdownProps) => {
   const router = useRouter();
 
   if (!isVisible) return null;
@@ -26,6 +27,25 @@ const ProfileDropdown = ({ isVisible, onClose }: ProfileDropdownProps) => {
     router.push('/drawer/settingPath'); 
   };
 
+  const getInitials = (name: string) => {
+    if (!name.trim()) return "U";
+
+    const nameParts = name.trim().split(" ").filter(Boolean);
+
+    if (nameParts.length === 1) {
+      return nameParts[0][0].toUpperCase();
+    }
+
+    return (
+      nameParts[0][0].toUpperCase() +
+      nameParts[1][0].toUpperCase()
+    );
+  };
+
+  const displayName = useMemo(() => {
+    return fullName?.trim() ? fullName : "User";
+  }, [fullName]);
+
   return (
     <View 
       className="absolute right-4 top-[105px] w-64 bg-white rounded-3xl border border-slate-100 z-[100]"
@@ -34,10 +54,17 @@ const ProfileDropdown = ({ isVisible, onClose }: ProfileDropdownProps) => {
       {/* Blue Header Section */}
       <View className="bg-[#EBF3FF] p-4 flex-row items-center rounded-t-3xl">
         <View className="w-12 h-12 bg-[#2563EB] rounded-full items-center justify-center shadow-sm">
-          <Text className="text-white font-bold text-lg">JD</Text>
+          <Text className="text-white font-bold text-lg">
+            {getInitials(displayName)}
+            </Text>
         </View>
-        <View className="ml-3">
-          <Text className="font-bold text-slate-900 text-base">John Doe</Text>
+
+        <View className="ml-3 flex-1">
+          <Text 
+          numberOfLines={1}
+          className="font-bold text-slate-900 text-base">
+            {displayName}
+            </Text>
           <Text className="text-slate-500 text-xs font-medium">Citizen</Text>
         </View>
       </View>

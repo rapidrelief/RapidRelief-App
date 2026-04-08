@@ -5,9 +5,11 @@ import { Feather } from '@expo/vector-icons';
 interface ProfileHeaderProps {
   isEditing: boolean;
   setIsEditing: (val: boolean) => void;
+  onSave: () => void;
+  onCancle: () => void;
 }
 
-const ProfileHeader = ({ isEditing, setIsEditing }: ProfileHeaderProps) => {
+const ProfileHeader = ({ isEditing, setIsEditing, onSave, onCancle, }: ProfileHeaderProps) => {
   const { width } = useWindowDimensions();
 
   // Optimized Responsive Scaling
@@ -59,7 +61,7 @@ const ProfileHeader = ({ isEditing, setIsEditing }: ProfileHeaderProps) => {
         {isEditing ? (
           <View className="flex-col items-end">
             <TouchableOpacity 
-              onPress={() => setIsEditing(false)}
+              onPress={onSave}
               style={{ 
                 paddingHorizontal: res.btnPaddingX, 
                 paddingVertical: res.btnPaddingY,
@@ -75,7 +77,7 @@ const ProfileHeader = ({ isEditing, setIsEditing }: ProfileHeaderProps) => {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              onPress={() => setIsEditing(false)}
+              onPress={onCancle}
               style={{ 
                 paddingHorizontal: res.btnPaddingX, 
                 paddingVertical: res.btnPaddingY,

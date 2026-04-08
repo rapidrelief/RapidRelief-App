@@ -18,6 +18,8 @@ import SignUpHeader from "./SignUpHeader";
 //firebase imports
 import { createUserWithEmailAndPassword,sendEmailVerification } from "firebase/auth";
 import { auth } from "@/app/config/firebase"
+import { db } from "@/app/config/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 const SignUpF = () => {
   const { width, height } = useWindowDimensions();
@@ -93,37 +95,15 @@ const SignUpF = () => {
       //sending verification email
       await sendEmailVerification(userCredential.user);
 
-    
-      //sending extra data to backend
-      const res = await fetch("http://192.168.18.135:8000/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          uid: userCredential.user.uid,
-          fullName: form.fullName,
+      await setDoc(doc(db, "user", userCredential.user.uid), {
+        fullName: form.fullName,
           email: form.email,
           phone: form.phone,
           emergency: form.emergency,
           address: form.address,
           cnic: form.cnic,
-        }),
       });
 
-      //debug log
-      console.log("Status:", res.status);
-
-      const data = await res.json();
-      console.log("Response:", data);
-
-      if (!res.ok) {
-        throw new Error("Server error");
-      }
-
-      if (data.status && data.status !== "success") {
-        throw new Error(data.message || "Backend Error");
-      }
       // const data = await res.json();
 
       // if (data.status !== "success") {

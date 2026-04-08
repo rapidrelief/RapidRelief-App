@@ -8,6 +8,7 @@ import Button from "../../components/Button";
 //firebase imports
 import { sendEmailVerification, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/app/config/firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const LogF = () => {
   const router = useRouter();
@@ -39,6 +40,9 @@ const LogF = () => {
       );
 
       const user = userCredential.user;
+
+      //saving login time
+      await AsyncStorage.setItem("loginTime", Date.now().toString());
 
       if (!user.emailVerified) {
         Alert.alert(
@@ -97,7 +101,7 @@ const LogF = () => {
       {/* BACK BUTTON */}
       <TouchableOpacity
         onPress={() => router.back()}
-        className="flex-row items-center mt-4 mb-4"
+        className="flex-row items-center mt-4 mb-4 self-start"
       >
         <Ionicons name="arrow-back" size={24} color="white" />
         <Text className="text-white ml-2 text-base">Back</Text>
