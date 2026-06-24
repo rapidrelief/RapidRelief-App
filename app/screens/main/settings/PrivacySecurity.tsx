@@ -297,7 +297,7 @@ const PrivacySecurity = () => {
                   activeOpacity={0.7}
                   className={`py-4 rounded-2xl items-center shadow-xl ${
                     canUpdate
-                      ? "bg-blue-600 shadow-blue-200"
+                      ? "bg-blue-600"
                       : "bg-slate-200 shadow-none"
                   }`}
                 >

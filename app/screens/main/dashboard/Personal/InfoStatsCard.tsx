@@ -175,7 +175,7 @@ const InfoStatsCard = ({
       <View className="relative">
         <View
           style={{ width: res.avatarSize, height: res.avatarSize }}
-          className="bg-[#2563EB] rounded-full items-center justify-center shadow-xl shadow-blue-300 mb-4"
+          className="bg-[#2563EB] rounded-full items-center justify-center shadow-xl mb-4"
         >
           <Text
             style={{ fontSize: res.avatarSize * 0.35 }}

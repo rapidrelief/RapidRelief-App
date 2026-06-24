@@ -3,9 +3,10 @@ import { View, Text, TouchableOpacity, Animated, useWindowDimensions } from 'rea
 import { Feather } from '@expo/vector-icons';
 import MapView, {Circle, Marker} from "react-native-maps";
 import { getZonesMap } from '@/app/services/api';
+import { subscribeToZones } from '@/app/services/realtimeService';
 import * as Location from "expo-location";
 
-const MapCard = () => {
+const MapCard = ({ refreshTick = 0 }: { refreshTick?: number }) => {
   const [zones, setZones] = useState([]);
   const [region, setRegion] = useState<any>(null);
   const [moved, setMoved] = useState(false);
@@ -13,15 +14,13 @@ const MapCard = () => {
 
   useEffect(() => {
     loadZones();
-
-    const interval = setInterval(() => {
-      loadZones();
-    }, 5000);
     
     getLocation();
     
-    return () => clearInterval(interval); 
-  }, []);
+    return subscribeToZones((data) => {
+      setZones(data?.zones || []);
+    });
+  }, [refreshTick]);
 
   const getLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
@@ -91,10 +90,13 @@ const MapCard = () => {
         region={region}
         onRegionChangeComplete={() => setMoved(true)}
       >
-        {zones.map((zone: any) => (
-          <React.Fragment key={zone.id}>
+        {zones.map((zone: any) => {
+          const zoneKey = `${zone.id}-${zone.lat}-${zone.lng}-${zone.radius_m}-${zone.state}`;
+
+          return (
+          <React.Fragment key={zoneKey}>
             <Marker
-              key={zone.id}
+              key={`marker-${zoneKey}`}
               coordinate={{
                 latitude: zone.lat,
                 longitude: zone.lng,
@@ -118,6 +120,7 @@ const MapCard = () => {
             </Marker>
 
             <Circle
+              key={`circle-${zoneKey}`}
               center={{
                 latitude: zone.lat,
                 longitude: zone.lng,
@@ -128,7 +131,7 @@ const MapCard = () => {
               strokeWidth={2}
             />
           </React.Fragment>
-        ))}
+        )})}
 
          {userLocation && (
               <Marker

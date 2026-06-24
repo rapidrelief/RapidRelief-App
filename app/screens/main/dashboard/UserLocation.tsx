@@ -3,6 +3,7 @@ import React, { memo, useEffect, useState } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
+import { getUserLocation, getAddressFromCoords } from "@/app/services/locationService";
 
 const UserLocation = () => {
   const router = useRouter();
@@ -19,31 +20,25 @@ const UserLocation = () => {
 
     const fetchLocation = async () => {
       try{
-        let { status } = await Location.requestForegroundPermissionsAsync();
+        const loc = await getUserLocation();
 
-        if (status !== "granted") {
-        setCurrentLocation("Permission denied");
+        if (!loc){
+          setCurrentLocation("Permission denied");
         setLiveActive(false);
         return;
-      }
+        }
 
-        const loc = await Location.getCurrentPositionAsync({});
+      
+
+        
+        
+
         setLiveActive(true);
 
-        const geo = await Location.reverseGeocodeAsync({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-        });
+        const address = await getAddressFromCoords(loc.coords);
+        setCurrentLocation(address);
 
-        if (geo.length > 0) {
-          const g = geo[0];
-
-          setCurrentLocation(
-            `${g.name || "Unknown"}, ${g.city || g.region || "Unknown"}, ${g.country || ""}`
-          );
-        } else {
-          setCurrentLocation("Unknown Location");
-        }
+       
       } catch (err) {
         console.log("Location fetch error:", err);
         setCurrentLocation("Location error");
@@ -87,7 +82,7 @@ const UserLocation = () => {
         {/* Live Location Badge */}
         <View
           className={`flex-row items-center px-6 py-3 rounded-2xl shadow-md ${
-            liveActive ? "bg-blue-600 shadow-blue-300" : "bg-red-600 shadow-red-300"
+            liveActive ? "bg-blue-600" : "bg-red-600"
           }`}
         >
           <View className="w-2.5 h-2.5 bg-white rounded-full mr-3 opacity-80" />

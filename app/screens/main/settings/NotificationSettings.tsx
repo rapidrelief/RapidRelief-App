@@ -1,58 +1,166 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useAppSettings } from '@/app/store/useAppSettings';
 
-// Define the shape of your settings to satisfy TypeScript
-interface SettingsState {
-  alerts: boolean;
-  weather: boolean;
-  sos: boolean;
-  sound: boolean;
-}
 
-const NotificationSettings = () => {
-  const [settings, setSettings] = useState<SettingsState>({
-    alerts: true,
-    weather: true,
-    sos: true,
-    sound: false,
-  });
+type SettingKey =
+  | "allNotifications"
+  | "alertsEnabled"
+  | "emergency"
+  | "flood"
+  | "sos"
+  | "weather"
+  | "fire"
+  | "earthquake"
 
-  // The 'keyof SettingsState' ensures the key must be alerts, weather, sos, or sound
-  const toggleSwitch = (key: keyof SettingsState) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+type Option = 
+  {
+    id: SettingKey;
+    title: string;
+    sub: string;
+    icon: string;
+    disabled?: boolean;
+  };
+    
+    const NotificationSettings = () => {
+
+  const { settings, updateState } = useAppSettings();
+
+  const toggle = (key: SettingKey) => {
+    updateState({
+      [key]: !settings[key],
+    });
   };
 
-  const options: { id: keyof SettingsState; title: string; sub: string; icon: string }[] = [
-    { id: 'alerts', title: 'Emergency Alerts', sub: 'Receive critical flood warnings', icon: 'bell' },
-    { id: 'weather', title: 'Weather Updates', sub: 'Get daily weather forecasts', icon: 'cloud' },
-    { id: 'sos', title: 'SOS Notifications', sub: 'Alerts for nearby emergencies', icon: 'activity' },
-    { id: 'sound', title: 'Sound & Vibration', sub: 'Enable alert sounds', icon: 'volume-2' },
+  const options: Option[] = [
+    {
+      id: 'allNotifications',
+      title: 'All Notifications',
+      sub: 'Master control for entire app',
+      icon: 'bell',
+    },
+    {
+      id: 'alertsEnabled',
+      title: 'Emergency Alerts',
+      sub: 'Flood & zone alerts',
+      icon: 'alert-circle',
+    },
+    {
+      id: 'flood',
+      title: 'Flood Alerts',
+      sub: 'Flood warnings',
+      icon: 'droplet',
+    },
+    {
+      id: 'emergency',
+      title: 'General Alerts',
+      sub: 'Signal / safety updates',
+      icon: 'alert-triangle',
+    },
+    {
+      id: 'sos',
+      title: 'SOS Alerts',
+      sub: 'Emergency nearby alerts',
+      icon: 'activity',
+    },
+
+    // 🚀 FUTURE FEATURES (disabled for now)
+    {
+      id: 'weather',
+      title: 'Weather Updates',
+      sub: 'Coming soon',
+      icon: 'cloud',
+      disabled: true,
+    },
+    {
+      id: 'fire',
+      title: 'Fire Alerts',
+      sub: 'Coming soon',
+      icon: 'flame',
+      disabled: true,
+    },
+    {
+      id: 'earthquake',
+      title: 'Earthquake Alerts',
+      sub: 'Coming soon',
+      icon: 'zap',
+      disabled: true,
+    },
   ];
 
   return (
     <View className="bg-white border border-slate-100 rounded-[32px] p-5 mb-6 shadow-sm">
+
+      {/* HEADER */}
       <View className="flex-row items-center mb-4">
         <View className="bg-orange-100 p-3 rounded-2xl">
           <Feather name="bell" size={20} color="#f97316" />
         </View>
-        <Text className="ml-3 text-lg font-bold text-slate-800">Notifications</Text>
+        <Text className="ml-3 text-lg font-bold text-slate-800">
+          Notifications
+        </Text>
       </View>
 
-      {options.map((item) => (
-        <View key={item.id} className="flex-row items-center justify-between py-4 border-b border-slate-50">
-          <View className="flex-1 pr-4">
-            <Text className="text-slate-900 font-bold text-base">{item.title}</Text>
-            <Text className="text-slate-500 text-xs">{item.sub}</Text>
+      {options.map((item) => {
+
+        const isMasterOff = !settings.allNotifications;
+
+        const isDisabled =
+          item.disabled ||
+          (item.id !== 'allNotifications' && isMasterOff);
+
+        const value = item.disabled
+          ? false
+          : item.id === 'allNotifications'
+            ? settings.allNotifications
+            : settings[item.id];
+
+        return (
+          <View
+            key={item.id}
+            className="flex-row items-center justify-between py-4 border-b border-slate-50"
+          >
+            <View className="flex-1 pr-4">
+              <Text className={`font-bold text-base ${isDisabled ? "text-gray-400" : "text-slate-900"}`}>
+                {item.title}
+              </Text>
+
+              <Text className="text-slate-500 text-xs">
+                {item.sub}
+              </Text>
+            </View>
+
+            <Switch
+              value={value}
+              disabled={isDisabled}
+              onValueChange={() => {
+                if (item.id === 'allNotifications') {
+                  const newVal = !settings.allNotifications;
+
+                  updateState({
+                    allNotifications: newVal,
+
+                    // 🔥 when OFF → force everything OFF
+                    ...(newVal === false && {
+                      alertsEnabled: false,
+                      flood: false,
+                      emergency: false,
+                      sos: false,
+                    }),
+                  });
+
+                  return;
+                }
+
+                toggle(item.id);
+              }}
+              trackColor={{ false: "#e2e8f0", true: "#000000" }}
+              thumbColor="#ffffff"
+            />
           </View>
-          <Switch
-            value={settings[item.id]}
-            onValueChange={() => toggleSwitch(item.id)}
-            trackColor={{ false: "#e2e8f0", true: "#000000" }}
-            thumbColor="#ffffff"
-          />
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 };

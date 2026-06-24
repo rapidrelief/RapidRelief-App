@@ -1,7 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { DrawerActions } from "@react-navigation/native";
-import { useNavigation, useRouter } from "expo-router";
-import React, { memo, useMemo, useState, useEffect } from "react";
+import { useNavigation, useRouter, useFocusEffect } from "expo-router";
+import React, { memo, useMemo, useState, useEffect, useCallback } from "react";
 import {
   Platform,
   StatusBar,
@@ -9,35 +9,43 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+
 import { auth, db } from "@/app/config/firebase";
 import { doc, onSnapshot } from "firebase/firestore";
+
 import ProfileDropdown from "../../../drawer/Profilepath/ProfileDropdown";
 
-// 1. Define the interface so TypeScript knows about onMenuPress
+// ✅ IMPORT notifications
+import { getNotifications } from "@/app/services/notificationService";
+
 interface NavbarProps {
   onMenuPress?: () => void;
 }
 
 const Navbar = ({ onMenuPress }: NavbarProps) => {
   const router = useRouter();
-  const navigation = useNavigation(); 
+  const navigation = useNavigation();
+
   const [showProfile, setShowProfile] = useState(false);
   const [fullName, setFullName] = useState("");
+
+  // ✅ NEW: unread state
+  const [hasUnread, setHasUnread] = useState(false);
 
   const topPadding = useMemo(
     () => (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 44),
     [],
   );
 
+  // 🔥 LOAD USER
   useEffect(() => {
     const user = auth.currentUser;
-
     if (!user) return;
 
     const unsubscribe = onSnapshot(
-      doc(db, "user", user.uid),
+      doc(db, "users", user.uid),
       (snapshot) => {
-        if(snapshot.exists()) {
+        if (snapshot.exists()) {
           const data = snapshot.data();
           setFullName(data.fullName || "");
         }
@@ -47,7 +55,20 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
     return unsubscribe;
   }, []);
 
-  // 2. Updated Trigger: Use the prop if it exists, otherwise fallback to local dispatch
+  // ✅ LOAD NOTIFICATIONS
+  const loadUnread = async () => {
+    const data = await getNotifications();
+    const unread = data.some(n => n.isUnread);
+    setHasUnread(unread);
+  };
+
+  // ✅ REFRESH when screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      loadUnread();
+    }, [])
+  );
+
   const handleOpenDrawer = () => {
     if (onMenuPress) {
       onMenuPress();
@@ -62,6 +83,8 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
         <View style={{ height: topPadding }} />
 
         <View className="flex-row items-center justify-between px-5 h-16">
+
+          {/* LEFT */}
           <View className="flex-row items-center">
             <TouchableOpacity
               onPress={handleOpenDrawer}
@@ -71,37 +94,58 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
               <Feather name="menu" size={24} color="#63564b" />
             </TouchableOpacity>
 
-            <View className="bg-blue-600 p-2 rounded-xl shadow-md shadow-blue-400">
+            <View className="bg-blue-600 p-2 rounded-xl shadow-md">
               <MaterialCommunityIcons name="star" size={20} color="white" />
             </View>
           </View>
 
+          {/* RIGHT */}
           <View className="flex-row items-center">
+
+            {/* 🔔 NOTIFICATION ICON */}
             <TouchableOpacity
               onPress={() => router.push("/drawer/notification")}
               className="mr-4 relative p-1"
               hitSlop={10}
             >
               <Ionicons name="notifications-outline" size={24} color="#4B5563" />
-              <View className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+
+              {/* ✅ FIX: CONDITIONAL RED DOT */}
+              {hasUnread && (
+                <View className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+              )}
             </TouchableOpacity>
 
+            {/* 👤 PROFILE */}
             <TouchableOpacity
               onPress={() => setShowProfile(!showProfile)}
               className={`p-1 rounded-full ${showProfile ? "bg-blue-50" : ""}`}
             >
-              <Feather name="user" size={24} color={showProfile ? "#2563EB" : "#4B5563"} />
+              <Feather
+                name="user"
+                size={24}
+                color={showProfile ? "#2563EB" : "#4B5563"}
+              />
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
+      {/* PROFILE DROPDOWN */}
       {showProfile && (
         <>
           <TouchableWithoutFeedback onPress={() => setShowProfile(false)}>
-            <View className="absolute inset-0 z-[90] bg-transparent" style={{ width: "100%", height: "1000%" }} />
+            <View
+              className="absolute inset-0 z-[90] bg-transparent"
+              style={{ width: "100%", height: "1000%" }}
+            />
           </TouchableWithoutFeedback>
-          <ProfileDropdown isVisible={showProfile} onClose={() => setShowProfile(false)} fullName={fullName}  />
+
+          <ProfileDropdown
+            isVisible={showProfile}
+            onClose={() => setShowProfile(false)}
+            fullName={fullName}
+          />
         </>
       )}
     </>

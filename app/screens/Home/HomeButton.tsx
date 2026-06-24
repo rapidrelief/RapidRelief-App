@@ -5,9 +5,10 @@ import Button from "./../../components/Button";
 interface HomeButtonProps {
   onLogin?: () => void;
   onSignUp?: () => void;
+  onOfflineSos?: () => void;
 }
 
-const HomeButton: React.FC<HomeButtonProps> = ({ onLogin, onSignUp }) => {
+const HomeButton: React.FC<HomeButtonProps> = ({ onLogin, onSignUp, onOfflineSos }) => {
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
 
   // Calculate responsive spacing
@@ -26,8 +27,13 @@ const HomeButton: React.FC<HomeButtonProps> = ({ onLogin, onSignUp }) => {
       </View>
 
       {/* Sign Up Button */}
-      <View style={{ width: '100%', alignItems: 'center' }}>
+      <View style={{ width: '100%', alignItems: 'center', marginBottom: marginVertical * 0.5 }}>
         <Button title="Sign Up" onPress={onSignUp} />
+      </View>
+
+      {/* Use Offline SOS Button */}
+      <View style={{ width: '100%', alignItems: 'center' }}>
+        <Button title="Use Offline SOS" onPress={onOfflineSos} />
       </View>
 
       {/* Terms & Privacy */}

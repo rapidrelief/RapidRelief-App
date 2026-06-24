@@ -15,17 +15,24 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import {
+  getEmergencyContacts,
+  saveEmergencyContacts,
+} from "@/app/services/emergencyContactsService";
 
 const ManageContacts = () => {
   const router = useRouter();
   const [primary, setPrimary] = useState("");
-  const [secondary, setSecondary] = useState("");
+  const [secondary, setSecondary] = useState<string[]>([""]);
+  const [saving, setSaving] = useState(false);
 
   // 1. ANIMATION SETUP
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    loadContacts();
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -40,20 +47,66 @@ const ManageContacts = () => {
     ]).start();
   }, []);
 
+  const loadContacts = async () => {
+    try {
+      const contacts = await getEmergencyContacts();
+      setPrimary(contacts.primary || "");
+      setSecondary(contacts.secondary.length ? contacts.secondary : [""]);
+    } catch (err) {
+      console.log("Contact load error:", err);
+    }
+  };
+
   // 2. VALIDATION LOGIC
   // Button is enabled only if primary contact has at least 10 digits
   const isFormValid = primary.trim().length >= 10;
 
   const handleGoBack = () => {
-    router.replace("/drawer/settingPath");
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/drawer/settingPath");
+    }
   };
 
-  const handleSave = () => {
+  const updateSecondary = (index: number, value: string) => {
+    setSecondary((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  };
+
+  const addSecondary = () => {
+    if (secondary.length >= 3) return;
+    setSecondary((prev) => [...prev, ""]);
+  };
+
+  const removeSecondary = (index: number) => {
+    setSecondary((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length ? next : [""];
+    });
+  };
+
+  const handleSave = async () => {
     if (!isFormValid) return; // Guard clause
-    console.log("Saving:", { primary, secondary });
-    Alert.alert("Success", "Contacts updated successfully!", [
-      { text: "OK", onPress: () => handleGoBack() },
-    ]);
+
+    try {
+      setSaving(true);
+      await saveEmergencyContacts({
+        primary,
+        secondary,
+      });
+
+      Alert.alert("Success", "Contacts updated successfully!", [
+        { text: "OK", onPress: () => handleGoBack() },
+      ]);
+    } catch (err: any) {
+      Alert.alert("Error", err?.message || "Could not save contacts");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // 3. RESPONSIVE HEADER HEIGHT
@@ -126,38 +179,58 @@ const ManageContacts = () => {
                   />
                 </View>
 
-                <View className="mb-6">
-                  <Text className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest ml-1">
-                    Secondary Contact
-                  </Text>
-                  <TextInput
-                    className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-slate-800 focus:border-blue-500"
-                    placeholder="+92 321 7654321"
-                    placeholderTextColor="#94a3b8"
-                    keyboardType="phone-pad"
-                    value={secondary}
-                    onChangeText={setSecondary}
-                  />
-                </View>
+                {secondary.map((contact, index) => (
+                  <View className="mb-4" key={index}>
+                    <View className="flex-row justify-between items-center mb-2">
+                      <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                        Secondary Contact {index + 1}
+                      </Text>
+
+                      {secondary.length > 1 && (
+                        <TouchableOpacity onPress={() => removeSecondary(index)}>
+                          <Text className="text-red-500 text-xs font-bold">Remove</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <TextInput
+                      className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-slate-800 focus:border-blue-500"
+                      placeholder="+92 321 7654321"
+                      placeholderTextColor="#94a3b8"
+                      keyboardType="phone-pad"
+                      value={contact}
+                      onChangeText={(value) => updateSecondary(index, value)}
+                    />
+                  </View>
+                ))}
+
+                {secondary.length < 3 && (
+                  <TouchableOpacity
+                    onPress={addSecondary}
+                    className="py-3 rounded-2xl items-center mb-6 border border-blue-100 bg-blue-50"
+                  >
+                    <Text className="text-blue-600 font-bold">Add Secondary Contact</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Save Button with Adaptive States */}
               <TouchableOpacity
                 onPress={handleSave}
-                disabled={!isFormValid}
+                disabled={!isFormValid || saving}
                 activeOpacity={0.7}
                 className={`py-4 rounded-2xl items-center mt-auto mb-6 shadow-xl ${
-                  isFormValid
-                    ? "bg-blue-600 shadow-blue-200"
+                  isFormValid && !saving
+                    ? "bg-blue-600"
                     : "bg-slate-200 shadow-none"
                 }`}
               >
                 <Text
                   className={`font-semibold text-lg ${
-                    isFormValid ? "text-white" : "text-slate-400"
+                    isFormValid && !saving ? "text-white" : "text-slate-400"
                   }`}
                 >
-                  Save Changes
+                  {saving ? "Saving..." : "Save Changes"}
                 </Text>
               </TouchableOpacity>
             </Animated.View>

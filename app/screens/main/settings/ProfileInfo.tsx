@@ -4,6 +4,9 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { auth, db } from '@/app/config/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
+import * as Location from 'expo-location';
+import { getUserLocation, getAddressFromCoords } from '@/app/services/locationService';
+import { normalizeEmergencyContacts } from '@/app/services/emergencyContactsService';
 
 interface InfoRowProps {
   icon: string;
@@ -68,7 +71,8 @@ const ProfileInfo = () => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
+  const [emergencyContact, setEmergencyContact] = useState('');
+  const [address, setAddress] = useState('Fetching Location...');
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -76,19 +80,42 @@ const ProfileInfo = () => {
     if (!user) return;
 
     const unsubscribe = onSnapshot(
-      doc (db, 'user', user.uid),
+      doc (db, 'users', user.uid),
       (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data();
 
           setFullName(data.fullName || '');
           setEmail(data.email || user.email || '');
-          setPhone(data.phone || data.locationAddress || '');
+          setPhone(data.phone || data.phone || '');
+          setEmergencyContact(normalizeEmergencyContacts(data).primary || '');
         }
       }
     );
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+  const getLiveAddress = async () => {
+    try {
+      const loc = await getUserLocation();
+
+      if (!loc) {
+        setAddress('Permission denied');
+        return;
+      }
+
+      const address = await getAddressFromCoords(loc.coords);
+      setAddress(address);
+      
+    } catch (err) {
+      console.log('Location error:', err);
+      setAddress('Location error');
+    }
+  };
+
+  getLiveAddress();
+}, []);
 
 
   // Scale the whole card's padding and border radius
@@ -138,6 +165,7 @@ const ProfileInfo = () => {
       {/* Information Rows */}
       <InfoRow icon="user" label="Full Name" value={fullName}/>
       <InfoRow icon="phone" label="Phone Number" value={phone}/>
+      <InfoRow icon="shield" label="Emergency Contact" value={emergencyContact}/>
       <InfoRow icon="mail" label="Email Address" value={email}/>
       <InfoRow icon="map-pin" label="live Location" value={address}/>
     </View>

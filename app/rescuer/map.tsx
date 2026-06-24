@@ -1,0 +1,1 @@
+export { default } from "@/app/screens/rescuer/map/RescuerMapScreen";

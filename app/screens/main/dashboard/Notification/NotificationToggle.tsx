@@ -23,7 +23,7 @@ const NotificationToggle = ({ icon, title, description, isEnabled, onToggle, ico
     <Switch
       value={isEnabled}
       onValueChange={onToggle}
-      trackColor={{ false: "#CBD5E1", true: "#000" }}
+      trackColor={{ false: "#CBD5E1", true: "#2563EB" }}
       thumbColor="#fff"
     />
   </View>

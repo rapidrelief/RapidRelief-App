@@ -1,25 +1,64 @@
-import React, { memo } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { memo, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, Linking } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router'; // Import router
+import { auth, db } from "@/app/config/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { normalizeEmergencyContacts } from "@/app/services/emergencyContactsService";
 
-const ContactCard = ({ type, phone, label, color }: any) => (
-  <View className="bg-white p-4 rounded-3xl border border-slate-100 mb-3">
-    <View className="flex-row justify-between items-center mb-2">
-      <Text className="text-slate-800 font-extrabold">{type}</Text>
-      <View className={`px-3 py-1 rounded-lg ${color}`}>
-        <Text className="text-[10px] font-bold">{label}</Text>
+const ContactCard = ({ type, phone, label, color, onCall }: any) => (
+  <View className="bg-white p-4 rounded-3xl border border-slate-100 mb-3 flex-row justify-between items-center">
+    <View className="flex-1 pr-3">
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-slate-800 font-extrabold">{type}</Text>
+        <View className={`px-3 py-1 rounded-lg ${color}`}>
+          <Text className="text-[10px] font-bold">{label}</Text>
+        </View>
+      </View>
+      <View className="flex-row items-center">
+        <Feather name="phone" size={14} color="#64748B" />
+        <Text className="text-slate-600 ml-2 font-semibold">{phone}</Text>
       </View>
     </View>
-    <View className="flex-row items-center">
-      <Feather name="phone" size={14} color="#64748B" />
-      <Text className="text-slate-600 ml-2 font-semibold">{phone}</Text>
-    </View>
+    <TouchableOpacity
+      onPress={() => onCall(phone)}
+      style={{
+        backgroundColor: '#EFF6FF',
+        padding: 10,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+      }}
+      activeOpacity={0.7}
+    >
+      <Feather name="phone" size={18} color="#2563EB" />
+    </TouchableOpacity>
   </View>
 );
 
 const EmergencyContacts = () => {
   const router = useRouter(); // Initialize router
+  const [contacts, setContacts] = useState({ primary: "", secondary: [] as string[] });
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      setContacts(normalizeEmergencyContacts(snap.exists() ? snap.data() : {}));
+    });
+
+    return unsub;
+  }, []);
+
+  const handleCall = (phone: string) => {
+    if (!phone) return;
+    Linking.openURL(`tel:${phone}`).catch((err) => {
+      console.log("Could not initiate call:", err);
+    });
+  };
+
+  const hasContacts = contacts.primary || contacts.secondary.length > 0;
 
   return (
     <View className="mb-6 px-1">
@@ -30,8 +69,30 @@ const EmergencyContacts = () => {
         <Text className="text-lg font-extrabold text-slate-800">Emergency Contacts</Text>
       </View>
 
-      <ContactCard type="Primary Contact" phone="+92 300 1234567" label="Active" color="bg-blue-50 text-blue-600" />
-      <ContactCard type="Secondary Contact" phone="+92 321 7654321" label="Backup" color="bg-slate-50 text-slate-600" />
+      {!hasContacts ? (
+        <View className="bg-white p-4 rounded-3xl border border-slate-100 mb-3">
+          <Text className="text-slate-500 font-semibold">
+            Go to Manage Contacts to add emergency contact.
+          </Text>
+        </View>
+      ) : (
+        <>
+          {contacts.primary ? (
+            <ContactCard type="Primary Contact" phone={contacts.primary} label="Active" color="bg-blue-50" onCall={handleCall} />
+          ) : null}
+
+          {contacts.secondary.map((phone, index) => (
+            <ContactCard
+              key={`${phone}-${index}`}
+              type={`Secondary Contact ${index + 1}`}
+              phone={phone}
+              label="Backup"
+              color="bg-slate-50"
+              onCall={handleCall}
+            />
+          ))}
+        </>
+      )}
 
       <TouchableOpacity 
         onPress={() => router.push('/drawer/sospath/ManageContacts')} // Navigation trigger

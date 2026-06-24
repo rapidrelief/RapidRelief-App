@@ -1,7 +1,10 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router'; // ADD THIS
+import { auth, db } from "@/app/config/firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { normalizeEmergencyContacts } from "@/app/services/emergencyContactsService";
 
 const ContactCard = ({ type, phone, label, color }: any) => (
   <View className="bg-white p-4 rounded-3xl border border-slate-100 mb-3">
@@ -20,6 +23,20 @@ const ContactCard = ({ type, phone, label, color }: any) => (
 
 const EmergencyContacts = () => {
   const router = useRouter(); // INITIALIZE ROUTER
+  const [contacts, setContacts] = useState({ primary: "", secondary: [] as string[] });
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      setContacts(normalizeEmergencyContacts(snap.exists() ? snap.data() : {}));
+    });
+
+    return unsub;
+  }, []);
+
+  const hasContacts = contacts.primary || contacts.secondary.length > 0;
 
   return (
     <View className="mb-6 px-1">
@@ -30,8 +47,29 @@ const EmergencyContacts = () => {
         <Text className="text-lg font-extrabold text-slate-800">Emergency Contacts</Text>
       </View>
 
-      <ContactCard type="Primary Contact" phone="+92 300 1234567" label="Active" color="bg-blue-50 text-blue-600" />
-      <ContactCard type="Secondary Contact" phone="+92 321 7654321" label="Backup" color="bg-slate-50 text-slate-600" />
+      {!hasContacts ? (
+        <View className="bg-white p-4 rounded-3xl border border-slate-100 mb-3">
+          <Text className="text-slate-500 font-semibold">
+            Go to Manage Contacts to add emergency contact.
+          </Text>
+        </View>
+      ) : (
+        <>
+          {contacts.primary ? (
+            <ContactCard type="Primary Contact" phone={contacts.primary} label="Active" color="bg-blue-50" />
+          ) : null}
+
+          {contacts.secondary.map((phone, index) => (
+            <ContactCard
+              key={`${phone}-${index}`}
+              type={`Secondary Contact ${index + 1}`}
+              phone={phone}
+              label="Backup"
+              color="bg-slate-50"
+            />
+          ))}
+        </>
+      )}
 
       {/* UPDATED BUTTON */}
       <TouchableOpacity 

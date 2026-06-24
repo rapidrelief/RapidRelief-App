@@ -1,6 +1,7 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { sendUserSOS } from "@/app/services/sosService";
 
 interface SosButtonProps {
   scale?: number;           
@@ -9,6 +10,7 @@ interface SosButtonProps {
 
 const SosButton = ({ scale = 1, showEmergencyText = true }: SosButtonProps) => {
   const { width } = useWindowDimensions();
+  const [sending, setSending] = useState(false);
   
   // RESPONSIVE LOGIC: 
   // 1. Take 50% of screen width as a base
@@ -16,8 +18,24 @@ const SosButton = ({ scale = 1, showEmergencyText = true }: SosButtonProps) => {
   // 3. Apply the 'scale' modifier for Dashboard vs Full Page use
   const baseSize = Math.min(Math.max(width * 0.5, 160), 240) * scale;
 
-  const handleLongPress = () => {
-    Alert.alert("SOS Sent", "Emergency responders have been notified of your location.");
+  const handleLongPress = async () => {
+    if (sending) return;
+
+    try {
+      setSending(true);
+      const result = await sendUserSOS("USER");
+
+      if (result?.error || result?.detail) {
+        Alert.alert("SOS Failed", String(result.error || result.detail));
+        return;
+      }
+
+      Alert.alert("SOS Sent", "Your request has been sent to rescuers.");
+    } catch (err: any) {
+      Alert.alert("SOS Failed", err?.message || "Could not send SOS request.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -30,7 +48,7 @@ const SosButton = ({ scale = 1, showEmergencyText = true }: SosButtonProps) => {
             onLongPress={handleLongPress}
             delayLongPress={3000}
             style={{ width: baseSize, height: baseSize }}
-            className="bg-[#EF4444] rounded-full items-center justify-center shadow-2xl shadow-red-500"
+            className={`${sending ? "bg-gray-500" : "bg-[#EF4444]"} rounded-full items-center justify-center shadow-2xl`}
           >
             <MaterialCommunityIcons 
                name="phone-outline" 
@@ -42,7 +60,7 @@ const SosButton = ({ scale = 1, showEmergencyText = true }: SosButtonProps) => {
               style={{ fontSize: baseSize * 0.24 }}
               className="text-white font-black tracking-tighter leading-none mt-1"
             >
-              SOS
+              {sending ? "..." : "SOS"}
             </Text>
 
             {showEmergencyText && (

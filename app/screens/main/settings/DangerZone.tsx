@@ -27,7 +27,7 @@ const DangerZone = () => {
         <TouchableOpacity
           onPress={() => setShowDeleteModal(true)}
           activeOpacity={0.8}
-          className="bg-red-600 py-4 rounded-[20px] items-center shadow-md shadow-red-200"
+          className="bg-red-600 py-4 rounded-[20px] items-center shadow-md"
         >
           <Text className="text-white font-medium text-lg">
             Delete Account

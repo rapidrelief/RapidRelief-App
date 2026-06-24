@@ -9,6 +9,8 @@ import Button from "../../components/Button";
 import { sendEmailVerification, signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/app/config/firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/app/config/firebase";
 
 const LogF = () => {
   const router = useRouter();
@@ -19,12 +21,13 @@ const LogF = () => {
   const [password, setPassword] = useState("");
   const [isChecked, setIsChecked] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [identity, setIdentity] = useState("");
 
   const validateEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
 
-  const canContinue = 
-  validateEmail(email) && 
-  password.length >= 6 && 
+  const canContinue =
+  (identity.includes("@") ? validateEmail(identity) : identity.length > 0) &&
+  password.length >= 6 &&
   isChecked;
 
   const handelLogin = async () => {
@@ -33,13 +36,30 @@ const LogF = () => {
     try {
       setLoading(true);
 
+      let emailToUse = identity;
+
+      if (!identity.includes("@")) {
+        const q = await getDocs(
+          query(collection(db, "users"), where("rescuerId", "==", identity))
+        );
+
+        if (q.empty) {
+          Alert.alert("Invalid ID");
+          return;
+        }
+
+        emailToUse = q.docs[0].data().email;
+      }
+
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        email,
+        emailToUse,
         password
       );
 
       const user = userCredential.user;
+
+
 
       //saving login time
       await AsyncStorage.setItem("loginTime", Date.now().toString());
@@ -62,7 +82,21 @@ const LogF = () => {
         return;
       }
 
-      router.replace("/drawer/dashboard");
+      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+
+if (!userDoc.exists()) {
+  Alert.alert("Error", "User data not found");
+  return;
+}
+
+const role = userDoc.data().role;
+
+// 🔥 ROLE BASED NAVIGATION
+if (role === "rescuer") {
+  router.replace("/rescuer/dashboard");
+} else {
+  router.replace("/drawer/dashboard");
+}
 
     } catch (error: any) {
   let message = "Login Failed";
@@ -109,15 +143,15 @@ const LogF = () => {
 
       {/*Email*/}
       <FormInput 
-        label="Email Address" 
-        placeholder="example@mail.com" 
+        label="Email Address or Rescuer ID" 
+        placeholder="example@mail.com or RES-xxxxxx" 
         iconName="mail-outline" 
         keyboardType="email-address" 
-        value={email} 
-        onChangeText={setEmail} 
+        value={identity} 
+        onChangeText={setIdentity} 
       />
 
-      {email.length > 0 && !validateEmail(email) && (
+      {identity.includes("@") && !validateEmail(identity) && (
         <Text className="text-yellow-400 text-xs mt-1">
           Enter a valid email
         </Text>
@@ -158,7 +192,7 @@ const LogF = () => {
           </View>
 
           <Text className="text-white ml-2 text-sm">
-            Remember me
+            Terms & Conditions
             </Text>
         </TouchableOpacity>
         

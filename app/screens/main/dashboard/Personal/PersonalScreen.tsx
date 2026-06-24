@@ -20,6 +20,7 @@ import { EmailAuthProvider, reauthenticateWithCredential, deleteUser, } from 'fi
 import Emergency from '../Emergency';
 import * as Location from "expo-location";
 import { getZonesMap } from '@/app/services/api';
+import { getEmergencyContacts, normalizeEmergencyContacts } from '@/app/services/emergencyContactsService';
 
 const PersonalScreen = () => {
   const insets = useSafeAreaInsets();
@@ -33,6 +34,7 @@ const PersonalScreen = () => {
   } | null>(null);
 
   const [zones, setZones] = useState<any[]>([]);
+  const [role, setRole] = useState("");
 
   //user data
   const [userInfo, setUserInfo] = useState({
@@ -80,8 +82,14 @@ const PersonalScreen = () => {
         return;
       }
 
-      await updateDoc(doc(db, "user", currentUser.uid), {
+      const contacts = await getEmergencyContacts();
+
+      await updateDoc(doc(db, "users", currentUser.uid), {
         emergency: userInfo.emergency,
+        emergencyContacts: {
+          primary: userInfo.emergency,
+          secondary: contacts.secondary || [],
+        },
         address: userInfo.address,
       });
 
@@ -147,7 +155,7 @@ useEffect(() => {
         return;
       }
 
-      const userDocRef = doc(db, "user", currentUser.uid);
+      const userDocRef = doc(db, "users", currentUser.uid);
       console.log("Current UID:", currentUser.uid);
       const userDoc = await getDoc(userDocRef);
 
@@ -156,11 +164,13 @@ useEffect(() => {
         const data = userDoc.data();
         console.log("Firestore Data:", data);
 
+        setRole(data.role);
+
         const fetchedData = {
           fullName: data.fullName || "",
           email: data.email || "",
           phone: data.phone || "",
-          emergency: data.emergency || "",
+          emergency: data.role ==="rescuer" ? "" : (normalizeEmergencyContacts(data).primary || ""),
           address: data.address || "",
           cnic: data.cnic || "",
         };
@@ -224,6 +234,7 @@ useFocusEffect(
               <CustomInputField label="Full Name" value={userInfo.fullName} icon="user" editable={false} loading={loading} />
               <CustomInputField label="Email Address" value={userInfo.email} icon="mail" editable={false} loading={loading} />
               <CustomInputField label="Phone Number" value={userInfo.phone}icon="phone" editable={false} loading={loading} />
+              {role !== "rescuer" && (
               <CustomInputField label="Emergency Contact" value={userInfo.emergency} icon="shield" required editable={isEditing} loading={loading} keyboardType="phone-pad"
                 error={emergencyError}
                 errorMessage={
@@ -236,6 +247,7 @@ useFocusEffect(
                   setUserInfo({ ...userInfo, emergency: cleaned });
                 
               }}  />
+            )}
             </View>
           </View>
 
