@@ -10,7 +10,9 @@ const MapLegend = () => (
     { color: "bg-green-600", label: "Safe Zone" },
     { color: "bg-red-600", label: "Flood Zone" },
     { color: "bg-orange-600", label: "SOS Zone" },
-    { color: "bg-yellow-300", label: "Weak signals" },
+    { color: "bg-yellow-300", label: "Weak Signal" },
+    { color: "bg-yellow-500", label: "Lost Zone" },
+    { color: "bg-gray-500", label: "No Signal" },
   ].map((item, index) => (
     <View key={index} className="flex-row items-center w-1/2 mb-3">
       <View className={`w-4 h-4 rounded-full ${item.color} border-2 border-white shadow-sm mr-2`} />

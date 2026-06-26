@@ -6,32 +6,27 @@ import {
   ScrollView,
   View,
   useWindowDimensions,
-  Keyboard,
   Alert,
   Text,
   TouchableOpacity
 } from "react-native";
-import { useRouter } from "expo-router"; // 1. Import the router
+import { useRouter } from "expo-router";
 import Button from "../../components/Button";
 import AgreeCheckbox from "./AgreeCheckbox";
 import SignUpHeader from "./SignUpHeader";
 
 //firebase imports
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { auth } from "@/app/config/firebase"
-import { db } from "@/app/config/firebase";
+import { auth, db } from "@/app/config/firebase";
 import { doc, setDoc } from "firebase/firestore";
 
 const SignUpF = () => {
   const { width, height } = useWindowDimensions();
   const cardPadding = width * 0.04;
-const verticalSpacing = height * 0.02;
-  const router = useRouter(); // 2. Initialize the router
+  const verticalSpacing = height * 0.02;
+  const router = useRouter();
+  
   const [loading, setLoading] = useState(false);
-  const [role, setRole] = useState<"user" | "rescuer">("user");
-
-
-
   const [agree, setAgree] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
@@ -58,31 +53,13 @@ const verticalSpacing = height * 0.02;
     form.password === form.confirmPassword &&
     form.address.trim().length >= 5 &&
     form.cnic.length === 13 &&
-    (role === "rescuer" || form.emergency.length === 11) &&
+    form.emergency.length === 11 &&
     agree;
-
-  // generate rescuer id
-  const generateRescuerId = () => {
-    return "RES-" + Math.random().toString(36).substring(2, 8).toUpperCase();
-  };
-
-  // 3. This function handles the cross button click
-  const handleClose = () => {
-    if (form.fullName || form.email || form.phone) {
-      // Optional: Ask user for confirmation if they've started typing
-      Alert.alert("Discard Changes?", "Are you sure you want to go back?", [
-        { text: "Cancel", style: "cancel" },
-        { text: "Discard", style: "destructive", onPress: () => router.back() }
-      ]);
-    } else {
-      router.back(); // Simply go back if form is empty
-    }
-  };
 
   const handleContinue = async () => {
     if (!isFormValid) return;
 
-    try { //creating firebase user
+    try {
       setLoading(true);
 
       const userCredential = await createUserWithEmailAndPassword(
@@ -93,30 +70,21 @@ const verticalSpacing = height * 0.02;
 
       const uid = userCredential.user.uid;
 
-      let rescuerId = null;
-
-      if (role === "rescuer") {
-        rescuerId = generateRescuerId();
-      }
-
-      //save to firestore
+      // save to firestore as regular user
       await setDoc(doc(db, "users", uid), {
         ...form,
-        role,
-        rescuerId,
+        role: "user",
         status: "Online",
         location: null,
       });
 
-      //sending verification email
+      // sending verification email
       await sendEmailVerification(userCredential.user);
 
       Alert.alert(
         "Account Created",
-        role === "rescuer"
-          ? `Your Rescuer ID: ${rescuerId}\nUse it to login.`
-          : "Verify your email before login.",
-        [{ text: "OK", onPress: () => router.replace("/screens/Home") }]
+        "Please verify your email before logging in.",
+        [{ text: "OK", onPress: () => router.replace("/auth/Login") }]
       );
 
     } catch (err: any) {
@@ -126,137 +94,120 @@ const verticalSpacing = height * 0.02;
     }
   };
 
- return (
-  <KeyboardAvoidingView
-    behavior={Platform.OS === "ios" ? "padding" : undefined}
-    style={{ flex: 1 }}
-  >
-    <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: 30, }}>
-      
-      <SignUpHeader />
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      style={{ flex: 1 }}
+    >
+      <ScrollView 
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 50 }} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+      >
+        
+        <SignUpHeader 
+          title="Create Account" 
+          subtitle="Join Rapid Relief to stay protected" 
+          onClose={() => router.back()} 
+        />
 
-      <View style={{ paddingHorizontal: width * 0.06 }}>
+        <View style={{ paddingHorizontal: width * 0.06 }}>
+          
+          <View className="bg-white/10 p-5 rounded-3xl border border-white/20 mb-6">
+            <FormInput label="Full Name" placeholder="John Doe" iconName="person-outline" value={form.fullName} onChangeText={(t) => handleInput("fullName", t)} />
 
-        {/* Role Toggle */}
-        <View className="flex-row justify-center mb-4">
-          <TouchableOpacity
-            onPress={() => setRole("user")}
-            className={`flex-1 p-3 mr-2 rounded-xl ${
-              role === "user" ? "bg-blue-500" : "bg-gray-300"
-            }`}
-          >
-            <Text className="text-center text-white">User</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setRole("rescuer")}
-            className={`flex-1 p-3 ml-2 rounded-xl ${
-              role === "rescuer" ? "bg-blue-500" : "bg-gray-300"
-            }`}
-          >
-            <Text className="text-center text-white">Rescuer</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Form Fields */}
-        <FormInput label="Full Name" placeholder="Full Name" iconName="person-outline" value={form.fullName} onChangeText={(t) => handleInput("fullName", t)} />
-
-        <FormInput label="Email Address" placeholder="example@mail.com" iconName="mail-outline" keyboardType="email-address" value={form.email} onChangeText={(t) => handleInput("email", t)} />
-        {form.email.length > 0 && !validateEmail(form.email) && (
-          <Text className="text-yellow-400 text-rs mt-1">
-            Please enter a valid email address
-          </Text>
-        )}
-
-        <FormInput label="Phone Number" placeholder="03XXXXXXXXX" iconName="call-outline" keyboardType="phone-pad" value={form.phone} onChangeText={(txt) => handleInput("phone", txt)} />
-        {form.phone.length > 0 && form.phone.length < 11 && (
-          <Text className="text-yellow-400 text-rs mt-1">
-            Phone Number must be at least 11 digits
-          </Text>
-        )}
-
-        <FormInput label="Password" placeholder="Minimum 6 characters" iconName="lock-closed-outline" isPassword value={form.password} onChangeText={(t) => handleInput("password", t)} />
-        {form.password.length > 0 && form.password.length < 6 && (
-          <Text className="text-yellow-400 text-rs mt-1">
-            Password must be at least 6 characters
-          </Text>
-        )}
-
-        <FormInput label="Confirm Password" placeholder="Re-enter Password" iconName="lock-closed-outline" isPassword value={form.confirmPassword} onChangeText={(t) => handleInput("confirmPassword", t)} />
-        {form.confirmPassword.length > 0 && form.password !== form.confirmPassword && (
-          <Text className="text-red-400 text-rs mt-1">
-            Passwords do not match
-          </Text>
-        )}
-
-        <FormInput label="CNIC (13 Digits)" placeholder="42XXXXXXXXXXX" iconName="card-outline" keyboardType="numeric" value={form.cnic} onChangeText={(t) => handleInput("cnic", t)} />
-        {form.cnic.length > 0 && form.cnic.length < 13 && (
-          <Text className="text-yellow-400 text-rs mt-1">
-            CNIC number must be at least 13 digits
-          </Text>
-        )}
-
-        {/* ✅ Emergency ONLY for user */}
-        {role === "user" && (
-          <View
-            style={{ padding: cardPadding, marginBottom: verticalSpacing, borderRadius: 16 }}
-            className="bg-white/10 border border-white/20 mt-4"
-          >
-            <FormInput
-              label="Emergency Contact"
-              placeholder="03XXXXXXXXX"
-              iconName="shield-outline"
-              keyboardType="phone-pad"
-              value={form.emergency}
-              onChangeText={(txt) => handleInput("emergency", txt)}
-            />
-
-            {form.emergency.length > 0 && (
-              <>
-                {form.emergency.length < 11 && (
-                  <Text className="text-yellow-400 text-rs mt-1">
-                    Emergency Number must be at least 11 digits
-                  </Text>
-                )}
-
-                {form.emergency === form.phone && (
-                  <Text className="text-yellow-400 text-rs mt-1">
-                    Emergency number should not be the same as phone number
-                  </Text>
-                )}
-              </>
+            <FormInput label="Email Address" placeholder="example@mail.com" iconName="mail-outline" keyboardType="email-address" value={form.email} onChangeText={(t) => handleInput("email", t)} />
+            {form.email.length > 0 && !validateEmail(form.email) && (
+              <Text className="text-yellow-400 text-xs mt-1 ml-2 font-bold mb-3 -top-2">
+                Please enter a valid email address
+              </Text>
             )}
+
+            <FormInput label="Phone Number" placeholder="03XXXXXXXXX" iconName="call-outline" keyboardType="phone-pad" value={form.phone} onChangeText={(txt) => handleInput("phone", txt)} maxLength={11} />
+            {form.phone.length > 0 && form.phone.length !== 11 && (
+              <Text className="text-yellow-400 text-xs mt-1 ml-2 font-bold mb-3 -top-2">
+                Phone Number must be exactly 11 digits
+              </Text>
+            )}
+
+            <FormInput label="Password" placeholder="Minimum 6 characters" iconName="lock-closed-outline" isPassword value={form.password} onChangeText={(t) => handleInput("password", t)} />
+            {form.password.length > 0 && form.password.length < 6 && (
+              <Text className="text-yellow-400 text-xs mt-1 ml-2 font-bold mb-3 -top-2">
+                Password must be at least 6 characters
+              </Text>
+            )}
+
+            <FormInput label="Confirm Password" placeholder="Re-enter Password" iconName="lock-closed-outline" isPassword value={form.confirmPassword} onChangeText={(t) => handleInput("confirmPassword", t)} />
+            {form.confirmPassword.length > 0 && form.password !== form.confirmPassword && (
+              <Text className="text-red-400 text-xs mt-1 ml-2 font-bold mb-3 -top-2">
+                Passwords do not match
+              </Text>
+            )}
+
+            <FormInput label="CNIC (13 Digits)" placeholder="42XXXXXXXXXXX" iconName="card-outline" keyboardType="numeric" value={form.cnic} onChangeText={(t) => handleInput("cnic", t)} maxLength={13} />
+            {form.cnic.length > 0 && form.cnic.length !== 13 && (
+              <Text className="text-yellow-400 text-xs mt-1 ml-2 font-bold mb-3 -top-2">
+                CNIC number must be exactly 13 digits
+              </Text>
+            )}
+            
+            <FormInput label="Home Address" placeholder="Street, City, Area" iconName="location-outline" value={form.address} onChangeText={(txt) => handleInput("address", txt)} />
+
+            <View className="mt-2 pt-4 border-t border-white/20">
+              <Text className="text-white font-bold mb-4">Emergency Setup</Text>
+              <FormInput
+                label="Emergency Contact"
+                placeholder="03XXXXXXXXX"
+                iconName="shield-half-outline"
+                keyboardType="phone-pad"
+                value={form.emergency}
+                onChangeText={(txt) => handleInput("emergency", txt)}
+                maxLength={11}
+              />
+              {form.emergency.length > 0 && (
+                <>
+                  {form.emergency.length !== 11 && (
+                    <Text className="text-yellow-400 text-xs mt-1 ml-2 font-bold mb-3 -top-2">
+                      Emergency Number must be exactly 11 digits
+                    </Text>
+                  )}
+                  {form.emergency === form.phone && (
+                    <Text className="text-yellow-400 text-xs mt-1 ml-2 font-bold mb-3 -top-2">
+                      Emergency contact must be different from phone
+                    </Text>
+                  )}
+                </>
+              )}
+            </View>
           </View>
-        )}
 
-        <FormInput label="Home Address" placeholder="Street, City, Area" iconName="location-outline" value={form.address} onChangeText={(txt) => handleInput("address", txt)} />
+          <AgreeCheckbox agree={agree} onToggle={() => setAgree(!agree)} />
 
-        <AgreeCheckbox agree={agree} onToggle={() => setAgree(!agree)} />
+          <View className="items-center mt-6 w-full">
+            <Button
+              title={loading ? "Creating Account..." : "Create Account"}
+              disabled={!isFormValid || loading}
+              onPress={handleContinue}
+            />
+          </View>
 
-{/* Login Link */}
-<View className="items-center mt-0 mb-0">
-  <TouchableOpacity onPress={() => router.push("/auth/Login")}>
-    <Text className="text-white text-sm">
-      Have an account?{" "}
-      <Text className="text-blue-400 font-semibold">
-        Login
-      </Text>
-    </Text>
-  </TouchableOpacity>
-</View>
+          <View className="items-center mt-6 flex-row justify-center">
+            <Text className="text-white/80 text-sm">
+              Already have an account?{" "}
+            </Text>
+            <TouchableOpacity onPress={() => router.push("/auth/Login")}>
+              <Text className="text-white font-black text-sm underline">
+                Log In
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-<View className="items-center w-full" style={{ marginTop: verticalSpacing }}>
-  <Button
-    title={loading ? "Signing up..." : "Continue"}
-    disabled={!isFormValid}
-    onPress={handleContinue}
-  />
-</View>
-
-      </View>
-    </ScrollView>
-  </KeyboardAvoidingView>
-);
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
 };
 
 export default SignUpF;

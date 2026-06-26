@@ -1,535 +1,294 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  Modal,
   RefreshControl,
   ScrollView,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
+  SafeAreaView
 } from "react-native";
 import Navbar from "../components/RescuerNavbar";
-import {
-  getZoneDeployment,
-  getZonesMap,
-  registerGateway,
-  registerNode,
-  deleteGateway,
-  deleteNode,
-} from "@/app/services/api";
+import { getZoneDeployment, getZonesMap } from "@/app/services/api";
 import { Ionicons } from "@expo/vector-icons";
-import { auth } from "@/app/config/firebase";
-import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { auth, db } from "@/app/config/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 const RescuerDeploymentScreen = () => {
-  const [zones, setZones] = useState<any[]>([]);
-  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
-  const [deployment, setDeployment] = useState<any>({ gateways: [], nodes: [] });
-  const [gatewayId, setGatewayId] = useState("");
-  const [nodeId, setNodeId] = useState("");
-  const [nodeGatewayId, setNodeGatewayId] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  
+  const [orgZones, setOrgZones] = useState<any[]>([]);
+  const [globalZones, setGlobalZones] = useState<any[]>([]);
+  
+  const [selectedOrgZoneId, setSelectedOrgZoneId] = useState<number | null>(null);
+  const [orgDeployment, setOrgDeployment] = useState<any>({ gateways: [], nodes: [] });
+  
+  const [globalDeployments, setGlobalDeployments] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ type: "gateway" | "node"; id: number } | null>(null);
-  const [password, setPassword] = useState("");
-  const [deleting, setDeleting] = useState(false);
-
   useEffect(() => {
-    loadZones();
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        loadInitialData(user.uid);
+      }
+    });
+    return () => unsub();
   }, []);
 
   useEffect(() => {
-    if (selectedZoneId) {
-      loadDeployment(selectedZoneId);
+    if (selectedOrgZoneId) {
+      loadOrgDeployment(selectedOrgZoneId);
     }
-  }, [selectedZoneId]);
+  }, [selectedOrgZoneId]);
 
-  const loadZones = async () => {
+  const loadInitialData = async (uid: string) => {
+    setLoading(true);
+    
+    // 1. Get orgId
+    let currentOrgId = null;
+    if (uid) {
+      const userDoc = await getDoc(doc(db, "users", uid));
+      if (userDoc.exists() && userDoc.data().organization_id) {
+        currentOrgId = String(userDoc.data().organization_id);
+        setOrgId(currentOrgId);
+      }
+    }
+
+    await fetchZonesAndDeployments(currentOrgId);
+  };
+
+  const fetchZonesAndDeployments = async (currentOrgId: string | null) => {
+    // 2. Get all zones
     const data = await getZonesMap();
     const list = data?.zones || [];
-    setZones(list);
+    
+    const orgZ = list.filter((z: any) => {
+      if (!currentOrgId) return false;
+      return String(z.organization_id) === currentOrgId;
+    });
+    const globZ = list.filter((z: any) => z.organization_id === null || z.organization_id === undefined);
+    
+    setOrgZones(orgZ);
+    setGlobalZones(globZ);
 
-    if (!selectedZoneId && list.length > 0) {
-      setSelectedZoneId(list[0].id);
+    if (orgZ.length > 0 && !selectedOrgZoneId) {
+      setSelectedOrgZoneId(orgZ[0].id);
     }
+
+    // 3. Fetch global deployments concurrently
+    const gDeps = await Promise.all(
+      globZ.map(async (z: any) => {
+        const dep = await getZoneDeployment(z.id);
+        return { zone: z, ...dep };
+      })
+    );
+    setGlobalDeployments(gDeps);
+
+    setLoading(false);
   };
 
-  const loadDeployment = async (zoneId: number) => {
+  const loadOrgDeployment = async (zoneId: number) => {
     const data = await getZoneDeployment(zoneId);
-    setDeployment(data || { gateways: [], nodes: [] });
-
-    const firstGateway = data?.gateways?.[0]?.device_id;
-    if (firstGateway && !nodeGatewayId) {
-      setNodeGatewayId(String(firstGateway));
-    }
+    setOrgDeployment(data || { gateways: [], nodes: [] });
   };
 
-  const refreshDeployment = async () => {
-    try {
-      setRefreshing(true);
-      await loadZones();
-
-      if (selectedZoneId) {
-        await loadDeployment(selectedZoneId);
-      }
-    } finally {
-      setRefreshing(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchZonesAndDeployments(orgId);
+    if (selectedOrgZoneId) {
+      await loadOrgDeployment(selectedOrgZoneId);
     }
+    setRefreshing(false);
   };
 
-  const handleRegisterGateway = async () => {
-    if (!selectedZoneId || !gatewayId) {
-      Alert.alert("Missing Data", "Select a zone and enter a gateway ID.");
-      return;
-    }
+  const selectedOrgZoneName = orgZones.find(z => z.id === selectedOrgZoneId)?.name || "Unknown Zone";
 
-    try {
-      setSaving(true);
-      const result = await registerGateway({
-        device_id: Number(gatewayId),
-        zone_id: selectedZoneId,
-      });
+  const renderDeviceCard = (device: any, isNode: boolean, zoneName: string) => {
+    const id = isNode ? device.node_id : device.device_id;
+    const title = isNode ? `Node ${id}` : `Gateway ${id}`;
+    const icon = isNode ? "pulse" : "wifi";
+    const color = device.status === "ONLINE" ? "#3B82F6" : device.status === "LOST" ? "#F59E0B" : "#EF4444";
+    
+    // Gateway-specific or Node-specific subtext
+    const subtext = isNode ? `Via Gateway: ${device.gateway_id}` : `Location: Zone Center`;
 
-      if (result?.detail || result?.error) {
-        Alert.alert("Gateway Not Registered", String(result.detail || result.error));
-        return;
-      }
+    return (
+      <View
+        key={id}
+        style={{
+          backgroundColor: "white",
+          padding: 16,
+          borderRadius: 12,
+          marginBottom: 8,
+          shadowColor: "#000",
+          shadowOpacity: 0.05,
+          shadowRadius: 5,
+          elevation: 2,
+        }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Ionicons name={icon} size={24} color={color} />
+            <View style={{ marginLeft: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: "bold", color: "#1F2937" }}>
+                {title} <Text style={{ fontSize: 14, fontWeight: "normal", color: "#6B7280" }}>- {zoneName}</Text>
+              </Text>
+              <Text style={{ fontSize: 12, color: "#6B7280" }}>
+                {subtext}
+              </Text>
+            </View>
+          </View>
+          <View style={{ backgroundColor: color, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+            <Text style={{ color: "white", fontSize: 10, fontWeight: "bold" }}>{device.status}</Text>
+          </View>
+        </View>
 
-      setGatewayId("");
-      await loadDeployment(selectedZoneId);
-      Alert.alert("Gateway Registered", `Copy this API key into gateway code:\n${result.api_key}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRegisterNode = async () => {
-    if (!selectedZoneId || !nodeId || !nodeGatewayId) {
-      Alert.alert("Missing Data", "Enter node ID and gateway ID.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const result = await registerNode({
-        node_id: Number(nodeId),
-        gateway_id: Number(nodeGatewayId),
-        zone_id: selectedZoneId,
-      });
-
-      if (result?.detail || result?.error) {
-        Alert.alert("Node Not Registered", String(result.detail || result.error));
-        return;
-      }
-
-      setNodeId("");
-      await loadDeployment(selectedZoneId);
-      Alert.alert("Node Registered", `Node ${result.node_id} is assigned to gateway ${result.gateway_id}.`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const initiateDelete = (type: "gateway" | "node", id: number) => {
-    Alert.alert(
-      "Confirm Deletion",
-      `Are you sure you want to permanently delete this ${type} (${id})?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            setDeleteTarget({ type, id });
-            setPassword("");
-            setPasswordModalVisible(true);
-          },
-        },
-      ]
+        {/* Alerts Row */}
+        <View style={{ flexDirection: "row", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#F3F4F6", alignItems: "center" }}>
+          {device.sos && (
+            <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, backgroundColor: "#FEE2E2", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+              <Ionicons name="warning" size={14} color="#EF4444" />
+              <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "bold", marginLeft: 4 }}>SOS</Text>
+            </View>
+          )}
+          {device.flood && (
+            <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, backgroundColor: "#DBEAFE", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+              <Ionicons name="water" size={14} color="#3B82F6" />
+              <Text style={{ fontSize: 12, color: "#3B82F6", fontWeight: "bold", marginLeft: 4 }}>FLOOD</Text>
+            </View>
+          )}
+          {isNode && (
+             <View style={{ flexDirection: "row", alignItems: "center", marginLeft: "auto" }}>
+               <Ionicons name={device.encrypted ? "lock-closed" : "lock-open"} size={14} color={device.encrypted ? "#10B981" : "#F59E0B"} />
+               <Text style={{ fontSize: 12, color: device.encrypted ? "#10B981" : "#F59E0B", fontWeight: "500", marginLeft: 4 }}>
+                 {device.encrypted ? "Encrypted" : "Open"}
+               </Text>
+             </View>
+          )}
+        </View>
+      </View>
     );
   };
 
-  const handleConfirmDelete = async () => {
-    if (!password) {
-      Alert.alert("Error", "Please enter your password.");
-      return;
-    }
-
-    const user = auth.currentUser;
-    if (!user || !user.email) {
-      Alert.alert("Error", "You are not logged in.");
-      return;
-    }
-
-    try {
-      setDeleting(true);
-
-      const credential = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, credential);
-
-      if (deleteTarget?.type === "gateway") {
-        const result = await deleteGateway(deleteTarget.id);
-        if (result?.error || result?.detail) {
-          throw new Error(result.error || result.detail);
-        }
-        Alert.alert("Success", `Gateway ${deleteTarget.id} deleted successfully.`);
-      } else if (deleteTarget?.type === "node") {
-        const result = await deleteNode(deleteTarget.id);
-        if (result?.error || result?.detail) {
-          throw new Error(result.error || result.detail);
-        }
-        Alert.alert("Success", `Node ${deleteTarget.id} deleted successfully.`);
-      }
-
-      setPasswordModalVisible(false);
-      setDeleteTarget(null);
-      setPassword("");
-      if (selectedZoneId) {
-        await loadDeployment(selectedZoneId);
-      }
-    } catch (err: any) {
-      console.log("Delete error:", err);
-      const msg = err?.code === "auth/invalid-credential" || err?.code === "auth/wrong-password"
-        ? "Incorrect password. Verification failed."
-        : err?.message || "Verification failed. Please try again.";
-      Alert.alert("Authentication Failed", msg);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   return (
-    <View className="flex-1 bg-[#F4F6FA]">
-      <Navbar />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6", paddingTop: 100 }}>
+      <Navbar title="Devices" />
 
-      <ScrollView
-        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refreshDeployment} />
-        }
-      >
-        <View className="px-5">
-          <Text className="text-3xl font-extrabold text-gray-900">
-            Deployment
-          </Text>
-          <Text className="text-gray-500 mt-1 mb-5">
-            Assign gateways and LoRa nodes to monitoring zones.
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#2563EB" />
+        </View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {/* =========================================================
+              SECTION 1: ORGANISATION DEVICES STATUS
+          ========================================================= */}
+          <Text style={{ fontSize: 20, fontWeight: "900", color: "#111827", marginBottom: 16, marginTop: 8 }}>
+            Organisation Devices Status
           </Text>
 
-          {refreshing && (
-            <View className="flex-row items-center justify-center bg-blue-50 border border-blue-100 rounded-2xl py-3 mb-5">
-              <ActivityIndicator size="small" color="#2563EB" />
-              <Text className="ml-2 text-blue-700 font-semibold">
-                Refreshing deployment...
-              </Text>
-            </View>
+          {orgZones.length === 0 ? (
+            <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 24 }}>No organization zones active.</Text>
+          ) : (
+            <>
+              {/* Zone Slider */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20, maxHeight: 50 }}>
+                {orgZones.map((z) => (
+                  <TouchableOpacity
+                    key={z.id}
+                    onPress={() => setSelectedOrgZoneId(z.id)}
+                    style={{
+                      backgroundColor: selectedOrgZoneId === z.id ? "#2563EB" : "white",
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      borderRadius: 20,
+                      marginRight: 10,
+                      borderWidth: 1,
+                      borderColor: selectedOrgZoneId === z.id ? "#2563EB" : "#D1D5DB",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      height: 40
+                    }}
+                  >
+                    <Text style={{ color: selectedOrgZoneId === z.id ? "white" : "#4B5563", fontWeight: "600" }}>
+                      {z.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Org Gateways */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 16, fontWeight: "bold", color: "#374151", marginBottom: 8 }}>
+                  Gateways
+                </Text>
+                {orgDeployment?.gateways?.length === 0 ? (
+                  <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 8 }}>No gateways in this zone.</Text>
+                ) : (
+                  orgDeployment.gateways?.map((g: any) => renderDeviceCard(g, false, selectedOrgZoneName))
+                )}
+              </View>
+
+              {/* Org Nodes */}
+              <View style={{ marginBottom: 32 }}>
+                <Text style={{ fontSize: 16, fontWeight: "bold", color: "#374151", marginBottom: 8 }}>
+                  Nodes
+                </Text>
+                {orgDeployment?.nodes?.length === 0 ? (
+                  <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 8 }}>No nodes in this zone.</Text>
+                ) : (
+                  orgDeployment.nodes?.map((n: any) => renderDeviceCard(n, true, selectedOrgZoneName))
+                )}
+              </View>
+            </>
           )}
 
-          {/* ZONE TABS SELECTOR */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
-            {zones.map((zone) => {
-              const active = selectedZoneId === zone.id;
-              return (
-                <TouchableOpacity
-                  key={zone.id}
-                  onPress={() => setSelectedZoneId(zone.id)}
-                  className={`mr-2 px-5 py-3 rounded-2xl border ${
-                    active 
-                      ? "bg-blue-600 border-blue-600 shadow-sm" 
-                      : "bg-white border-gray-200/80 shadow-sm"
-                  }`}
-                >
-                  <Text className={`font-bold ${active ? "text-white" : "text-gray-700"}`}>
-                    {zone.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {/* =========================================================
+              SECTION 2: GLOBAL DEVICES STATUS
+          ========================================================= */}
+          <Text style={{ fontSize: 20, fontWeight: "900", color: "#111827", marginBottom: 16, marginTop: 16 }}>
+            Global Devices Status
+          </Text>
 
-          {/* REGISTER GATEWAY CARD */}
-          <View className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm mb-6">
-            <Text className="text-xl font-bold text-gray-900 mb-4">
-              Register Gateway
-            </Text>
+          {globalDeployments.length === 0 ? (
+            <Text style={{ color: "#6B7280", fontStyle: "italic" }}>No global zones active.</Text>
+          ) : (
+            globalDeployments.map((gDep) => (
+              <View key={gDep.zone.id} style={{ backgroundColor: "#E5E7EB", borderRadius: 16, padding: 16, marginBottom: 24 }}>
+                <Text style={{ fontSize: 18, fontWeight: "bold", color: "#1F2937", marginBottom: 12 }}>
+                  {gDep.zone.name}
+                </Text>
 
-            <Input
-              label="Gateway Device ID"
-              value={gatewayId}
-              keyboardType="numeric"
-              onChangeText={setGatewayId}
-              placeholder="e.g. 101"
-            />
-
-            <TouchableOpacity
-              disabled={saving}
-              onPress={handleRegisterGateway}
-              className={`rounded-2xl py-4 mt-2 shadow-sm ${saving ? "bg-gray-400" : "bg-blue-600"}`}
-            >
-              <Text className="text-white text-center font-bold">
-                Register Gateway
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* REGISTER NODE CARD */}
-          <View className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm mb-6">
-            <Text className="text-xl font-bold text-gray-900 mb-4">
-              Register Node
-            </Text>
-
-            <View className="flex-row gap-4 mb-2">
-              <View className="flex-1">
-                <Input
-                  label="Node ID"
-                  value={nodeId}
-                  keyboardType="numeric"
-                  onChangeText={setNodeId}
-                  placeholder="e.g. 201"
-                />
-              </View>
-              <View className="flex-1">
-                <Input
-                  label="Gateway ID"
-                  value={nodeGatewayId}
-                  keyboardType="numeric"
-                  onChangeText={setNodeGatewayId}
-                  placeholder="e.g. 101"
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              disabled={saving}
-              onPress={handleRegisterNode}
-              className={`rounded-2xl py-4 mt-2 shadow-sm ${saving ? "bg-gray-400" : "bg-red-600"}`}
-            >
-              <Text className="text-white text-center font-bold">
-                Register Node
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* GATEWAYS SECTION */}
-          <DeviceSection title="Gateways" empty="No gateways deployed">
-            {(deployment.gateways || []).map((gateway: any) => (
-              <DeviceCard
-                key={gateway.device_id}
-                title={`Gateway ${gateway.device_id}`}
-                status={gateway.status || getDeviceStatus(gateway)}
-                zoneOrGatewayLabel="Zone ID"
-                zoneOrGatewayValue={gateway.zone_id}
-                flood={gateway.flood}
-                sos={gateway.sos}
-                lastSeen={formatTime(gateway.last_seen)}
-                onDelete={() => initiateDelete("gateway", gateway.device_id)}
-              />
-            ))}
-          </DeviceSection>
-
-          {/* NODES SECTION */}
-          <DeviceSection title="Nodes" empty="No nodes deployed">
-            {(deployment.nodes || []).map((node: any) => (
-              <DeviceCard
-                key={node.node_id}
-                title={`Node ${node.node_id}`}
-                status={node.status || getDeviceStatus(node)}
-                zoneOrGatewayLabel="Gateway ID"
-                zoneOrGatewayValue={node.gateway_id}
-                flood={node.flood}
-                sos={node.sos}
-                lastSeen={formatTime(node.last_seen)}
-                onDelete={() => initiateDelete("node", node.node_id)}
-              />
-            ))}
-          </DeviceSection>
-        </View>
-      </ScrollView>
-
-      {/* ================= PASSWORD CONFIRMATION MODAL ================= */}
-      <Modal visible={passwordModalVisible} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center p-6">
-          <View className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
-            <Text className="text-xl font-bold text-gray-900 mb-2">
-              Security Verification
-            </Text>
-            <Text className="text-gray-500 mb-5">
-              Enter your password to permanently delete this {deleteTarget?.type} ({deleteTarget?.id}).
-            </Text>
-
-            <TextInput
-              secureTextEntry
-              autoFocus
-              style={{
-                backgroundColor: "#F8FAFC",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                borderRadius: 16,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                color: "#0F172A",
-                fontSize: 15,
-                marginBottom: 20
-              }}
-              placeholder="Enter password"
-              placeholderTextColor="#94A3B8"
-              value={password}
-              onChangeText={setPassword}
-            />
-
-            <View className="flex-row justify-end gap-3">
-              <TouchableOpacity
-                onPress={() => {
-                  setPasswordModalVisible(false);
-                  setDeleteTarget(null);
-                  setPassword("");
-                }}
-                className="bg-gray-100 px-5 py-3 rounded-xl"
-              >
-                <Text className="text-gray-700 font-bold">Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                disabled={deleting}
-                onPress={handleConfirmDelete}
-                className="bg-red-600 px-5 py-3 rounded-xl flex-row items-center justify-center min-w-[100px]"
-              >
-                {deleting ? (
-                  <ActivityIndicator size="small" color="white" />
+                {/* Gateways inside Global Card */}
+                <Text style={{ fontSize: 14, fontWeight: "bold", color: "#4B5563", marginBottom: 8 }}>Gateways</Text>
+                {gDep.gateways?.length === 0 ? (
+                  <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 12, fontSize: 12 }}>No gateways.</Text>
                 ) : (
-                  <Text className="text-white font-bold text-center">Delete</Text>
+                  gDep.gateways?.map((g: any) => renderDeviceCard(g, false, gDep.zone.name))
                 )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+
+                {/* Nodes inside Global Card */}
+                <Text style={{ fontSize: 14, fontWeight: "bold", color: "#4B5563", marginBottom: 8, marginTop: 8 }}>Nodes</Text>
+                {gDep.nodes?.length === 0 ? (
+                  <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 12, fontSize: 12 }}>No nodes.</Text>
+                ) : (
+                  gDep.nodes?.map((n: any) => renderDeviceCard(n, true, gDep.zone.name))
+                )}
+              </View>
+            ))
+          )}
+
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
-};
-
-const Input = ({ label, ...props }: any) => (
-  <View style={{ marginBottom: 12 }}>
-    <Text style={{ color: "#475569", fontWeight: "600", marginBottom: 6, fontSize: 14 }}>{label}</Text>
-    <TextInput
-      {...props}
-      style={{
-        backgroundColor: "#F8FAFC",
-        borderWidth: 1,
-        borderColor: "#E2E8F0",
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        color: "#0F172A",
-        fontSize: 15,
-      }}
-      placeholderTextColor="#94A3B8"
-    />
-  </View>
-);
-
-const DeviceSection = ({ title, empty, children }: any) => (
-  <View className="mb-6">
-    <Text className="text-xl font-bold text-gray-900 mb-3">{title}</Text>
-    {React.Children.count(children) === 0 ? (
-      <View className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm items-center">
-        <Ionicons name="hardware-chip-outline" size={32} color="#94A3B8" />
-        <Text className="text-gray-400 font-semibold mt-2 text-center">{empty}</Text>
-      </View>
-    ) : (
-      children
-    )}
-  </View>
-);
-
-const DeviceCard = ({ 
-  title, 
-  status, 
-  zoneOrGatewayLabel, 
-  zoneOrGatewayValue, 
-  flood, 
-  sos, 
-  lastSeen, 
-  onDelete 
-}: any) => (
-  <View className="bg-white rounded-2xl p-5 mb-4 border border-gray-100 shadow-sm">
-    <View className="flex-row justify-between items-center">
-      <View>
-        <Text className="text-lg font-bold text-gray-900">{title}</Text>
-        <Text className="text-xs text-gray-500 mt-0.5 font-semibold">
-          {zoneOrGatewayLabel}: <Text className="text-gray-800 font-bold">{zoneOrGatewayValue}</Text>
-        </Text>
-      </View>
-      <View className="flex-row items-center gap-3">
-        <View className={`px-2 py-1 rounded-full ${getStatusBg(status)}`}>
-          <Text className={`text-[10px] font-extrabold tracking-wider ${getStatusText(status)}`}>
-            {formatStatus(status)}
-          </Text>
-        </View>
-        {onDelete && (
-          <TouchableOpacity onPress={onDelete} activeOpacity={0.7} className="p-1">
-            <Ionicons name="trash-outline" size={18} color="#EF4444" />
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
-
-    <View className="h-[1px] bg-gray-100 my-3" />
-
-    <View className="flex-row justify-between items-center flex-wrap gap-2">
-      <View className="flex-row items-center gap-3">
-        <View className={`flex-row items-center px-2 py-1 rounded-lg ${flood ? "bg-red-50 border border-red-100" : "bg-gray-50 border border-gray-100"}`}>
-          <Ionicons name="water-outline" size={14} color={flood ? "#EF4444" : "#94A3B8"} />
-          <Text className={`text-[10px] font-extrabold ml-1 ${flood ? "text-red-700" : "text-gray-500"}`}>
-            FLOOD: {flood ? "YES" : "NO"}
-          </Text>
-        </View>
-
-        <View className={`flex-row items-center px-2 py-1 rounded-lg ${sos ? "bg-pink-50 border border-pink-100" : "bg-gray-50 border border-gray-100"}`}>
-          <Ionicons name="alert-circle-outline" size={14} color={sos ? "#EC4899" : "#94A3B8"} />
-          <Text className={`text-[10px] font-extrabold ml-1 ${sos ? "text-pink-700" : "text-gray-500"}`}>
-            SOS: {sos ? "YES" : "NO"}
-          </Text>
-        </View>
-      </View>
-
-      <Text className="text-xs text-gray-400 font-semibold">
-        🕒 {lastSeen}
-      </Text>
-    </View>
-  </View>
-);
-
-const formatTime = (timestamp?: number | null) => {
-  if (!timestamp) return "Never";
-  return new Date(timestamp * 1000).toLocaleString();
-};
-
-const getDeviceStatus = (device: any) => {
-  if (!device?.last_seen) return "NOT_ASSIGNED";
-  if (device?.is_lost) return "LOST";
-  return "ONLINE";
-};
-
-const formatStatus = (status: string) => {
-  if (status === "NOT_ASSIGNED") return "NOT ASSIGNED";
-  return status;
-};
-
-const getStatusBg = (status: string) => {
-  if (status === "ONLINE") return "bg-green-50 border border-green-100";
-  if (status === "LOST") return "bg-red-50 border border-red-100";
-  return "bg-gray-50 border border-gray-100";
-};
-
-const getStatusText = (status: string) => {
-  if (status === "ONLINE") return "text-green-700";
-  if (status === "LOST") return "text-red-700";
-  return "text-gray-700";
 };
 
 export default RescuerDeploymentScreen;

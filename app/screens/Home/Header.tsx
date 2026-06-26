@@ -1,11 +1,9 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, useWindowDimensions, View } from 'react-native';
 
 const Header = () => {
   const { height: screenHeight, width: screenWidth } = useWindowDimensions();
   
-  // 1. Initialize animation values
   const fadeAnim = useRef(new Animated.Value(0)).current; 
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -25,16 +23,7 @@ const Header = () => {
   }, []);
 
   return (
-    <LinearGradient
-      colors={['#33B3FF', '#33B3FF']}
-      style={{ 
-        flex: 1, // Uses the height provided by the parent (30% of screen)
-        width: '100%', 
-        justifyContent: 'center', 
-        alignItems: 'center',
-        paddingTop: screenHeight * 0.02 // Reduced padding to keep it centered
-      }}
-    >
+    <View style={{ width: '100%', alignItems: 'center', paddingTop: screenHeight * 0.05 }}>
       <Animated.View 
         style={{ 
           opacity: fadeAnim, 
@@ -43,36 +32,39 @@ const Header = () => {
           width: '100%'
         }}
       >
-        {/* Title: Responsive size based on width */}
         <Text style={{ 
           color: 'white', 
-          fontSize: screenWidth * 0.1, 
-          fontWeight: 'bold' 
+          fontSize: screenWidth * 0.12, 
+          fontWeight: '900',
+          letterSpacing: 2
         }}>
           RAPID
         </Text>
         
-        {/* Subtitle: Responsive size based on width */}
         <Text style={{ 
-          color: 'white', 
-          fontSize: screenWidth * 0.06, 
-          fontWeight: '300',
-          marginTop: screenHeight * 0.005, // Responsive margin
-          letterSpacing: 4
+          color: 'rgba(255, 255, 255, 0.9)', 
+          fontSize: screenWidth * 0.05, 
+          fontWeight: '400',
+          marginTop: -5,
+          letterSpacing: 6
         }}>
           RELIEF
         </Text>
 
-        {/* Responsive accent line */}
         <View style={{ 
-          marginTop: screenHeight * 0.02, 
-          width: screenWidth * 0.25, 
+          marginTop: 15, 
+          width: 40, 
           height: 4, 
-          backgroundColor: 'white', 
-          borderRadius: 2 
+          backgroundColor: '#38bdf8', 
+          borderRadius: 2,
+          shadowColor: '#38bdf8',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.8,
+          shadowRadius: 10,
+          elevation: 5
         }} />
       </Animated.View>
-    </LinearGradient>
+    </View>
   );
 };
 

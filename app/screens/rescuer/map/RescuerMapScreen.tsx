@@ -207,29 +207,9 @@ const RescuerMapScreen = () => {
           latitudeDelta: parsedRescuer?.lat || parsedSOS?.lat ? 0.01 : 0.05,
           longitudeDelta: parsedRescuer?.lng || parsedSOS?.lng ? 0.01 : 0.05,
         }}
+        showsUserLocation={true}
+        showsMyLocationButton={false}
       >
-        {/* USER LOCATION */}
-        {userLocation && (
-          <Marker
-            coordinate={{
-              latitude: userLocation.latitude,
-              longitude: userLocation.longitude,
-            }}
-            title="You"
-          >
-            <View
-              style={{
-                width: 14,
-                height: 14,
-                borderRadius: 7,
-                backgroundColor: "#2563EB",
-                borderWidth: 3,
-                borderColor: "#fff",
-              }}
-            />
-          </Marker>
-        )}
-
         {/* ZONES */}
         {zones.map((z) => {
           const isSelected = selectedZone?.id === z.id;

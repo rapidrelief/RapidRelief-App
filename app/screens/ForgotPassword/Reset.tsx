@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Alert,
   useWindowDimensions,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import FormInput from "../../components/FormInput";
@@ -61,51 +62,55 @@ const Reset = () => {
   };
 
   return (
-    <View style={{ flex: 1, paddingHorizontal: width * 0.08 }}>
-
+    <ScrollView 
+      contentContainerStyle={{ flexGrow: 1, paddingHorizontal: width * 0.06, paddingBottom: 50 }} 
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* BACK BUTTON */}
       <TouchableOpacity
         onPress={() => router.back()}
-        className="flex-row items-center mt-6 mb-6"
+        className="w-10 h-10 bg-white/10 rounded-full items-center justify-center mt-6 mb-8 border border-white/20"
       >
         <Ionicons name="arrow-back" size={24} color="white" />
-        <Text className="text-white ml-2 text-base">Back</Text>
       </TouchableOpacity>
 
-      {/* TITLE */}
-      <Text className="text-white text-3xl font-bold">
-        Reset Password
-      </Text>
-
-      <Text className="text-white/70 mt-2 mb-6">
-        Enter your email to receive a reset link
-      </Text>
-
-      {/* INPUT */}
-      <FormInput
-        label="Email Address"
-        placeholder="example@mail.com"
-        iconName="mail-outline"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      {email.length > 0 && !validateEmail(email) && (
-        <Text className="text-yellow-400 text-xs mt-1">
-          Enter a valid email
+      {/* FORM CARD */}
+      <View className="bg-white/10 p-6 rounded-3xl border border-white/20">
+        <Text className="text-white text-3xl font-bold mb-2">
+          Reset Password
         </Text>
-      )}
 
-      {/* BUTTON */}
-      <View className="items-center mt-8">
-        <Button
-          title={loading ? "Sending..." : "Send Reset Email"}
-          onPress={handleReset}
-          disabled={!validateEmail(email) || loading}
+        <Text className="text-white/70 mb-8 font-medium">
+          Enter your email to receive a reset link
+        </Text>
+
+        {/* INPUT */}
+        <FormInput
+          label="Email Address"
+          placeholder="example@mail.com"
+          iconName="mail-outline"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
         />
+
+        {email.length > 0 && !validateEmail(email) && (
+          <Text className="text-yellow-400 text-xs font-bold mb-3 -top-2 ml-2">
+            Enter a valid email address
+          </Text>
+        )}
+
+        {/* BUTTON */}
+        <View className="items-center mt-4">
+          <Button
+            title={loading ? "Sending..." : "Send Reset Email"}
+            onPress={handleReset}
+            disabled={!validateEmail(email) || loading}
+          />
+        </View>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 

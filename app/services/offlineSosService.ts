@@ -22,47 +22,53 @@ export interface MockBleDevice {
 }
 
 export const requestOfflinePermissions = async () => {
-  const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+  let locationGranted = false;
   let bluetoothGranted = false;
 
-  if (Platform.OS === "android") {
-    if (Platform.Version >= 31) {
-      const scanGranted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-        {
-          title: "Bluetooth Scan Permission",
-          message: "RapidRelief needs access to scan for nearby SOS nodes.",
-          buttonNeutral: "Ask Later",
-          buttonNegative: "Cancel",
-          buttonPositive: "OK"
-        }
-      );
-      const connectGranted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-        {
-          title: "Bluetooth Connect Permission",
-          message: "RapidRelief needs access to connect to nearby SOS nodes.",
-          buttonNeutral: "Ask Later",
-          buttonNegative: "Cancel",
-          buttonPositive: "OK"
-        }
-      );
-      bluetoothGranted =
-        scanGranted === PermissionsAndroid.RESULTS.GRANTED &&
-        connectGranted === PermissionsAndroid.RESULTS.GRANTED;
+  try {
+    const { status: locStatus } = await Location.requestForegroundPermissionsAsync();
+    locationGranted = locStatus === "granted";
+
+    if (Platform.OS === "android") {
+      if (Platform.Version >= 31) {
+        // Use Promise.race to prevent indefinite hanging if Android swallows the request
+        const permissionPromise = PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT
+        ]);
+        
+        const timeoutPromise = new Promise<{ [key: string]: string }>((_, reject) => 
+          setTimeout(() => reject(new Error("Permission request timed out")), 2000)
+        );
+
+        const results = await Promise.race([permissionPromise, timeoutPromise]);
+        
+        bluetoothGranted =
+          results[PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN] === PermissionsAndroid.RESULTS.GRANTED &&
+          results[PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT] === PermissionsAndroid.RESULTS.GRANTED;
+      } else {
+        const permissionPromise = PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        const timeoutPromise = new Promise<string>((_, reject) => 
+          setTimeout(() => reject(new Error("Permission request timed out")), 2000)
+        );
+        
+        const fineLocationGranted = await Promise.race([permissionPromise, timeoutPromise]);
+        bluetoothGranted = fineLocationGranted === PermissionsAndroid.RESULTS.GRANTED;
+      }
     } else {
-      const fineLocationGranted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
-      );
-      bluetoothGranted = fineLocationGranted === PermissionsAndroid.RESULTS.GRANTED;
+      // iOS permissions are handled via app.json configuration automatically
+      bluetoothGranted = true;
     }
-  } else {
-    // iOS permissions are handled via app.json configuration automatically
-    bluetoothGranted = true;
+  } catch (err) {
+    console.warn("Permission request failed or timed out:", err);
+    locationGranted = false;
+    bluetoothGranted = false;
   }
 
   return {
-    locationGranted: locStatus === "granted",
+    locationGranted,
     bluetoothGranted,
   };
 };
@@ -75,26 +81,26 @@ export const startMockBleScan = (onDeviceFound: (devices: MockBleDevice[]) => vo
   try {
     const mgr = getManager();
     mgr.startDeviceScan(
-    [serviceUUID],
-    null,
-    (error, device) => {
-      if (error) {
-        console.log("BLE scanning failed:", error);
-        return;
+      [serviceUUID],
+      null,
+      (error, device) => {
+        if (error) {
+          console.log("BLE scanning failed:", error);
+          return;
+        }
+        if (device) {
+          const id = device.id;
+          const name = device.name || "RapidRelief Node";
+          const rssi = device.rssi || -100;
+          
+          discovered[id] = { id, name, rssi };
+          onDeviceFound(Object.values(discovered));
+        }
       }
-      if (device) {
-        const id = device.id;
-        const name = device.name || "RapidRelief Node";
-        const rssi = device.rssi || -100;
-        
-        discovered[id] = { id, name, rssi };
-        onDeviceFound(Object.values(discovered));
-      }
-    }
-  );
+    );
   } catch (e) {
-    console.warn("Error starting BLE scan:", e);
-    // Notify user somehow, or just let it fail silently (the UI will stop scanning later)
+    console.warn("Error starting BLE scan. Native module might be missing:", e);
+    // In production, we don't inject mock nodes. The UI will just show "No nodes discovered" after the timeout.
   }
 
   return () => {

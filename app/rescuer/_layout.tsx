@@ -267,10 +267,11 @@ export default function RescuerLayout() {
       <Drawer.Screen name="dashboard" options={{ title: "Dashboard" }} />
       <Drawer.Screen name="map" options={{ title: "Map" }} />
       <Drawer.Screen name="zones" options={{ title: "Zones" }} />
-      <Drawer.Screen name="deployment" options={{ title: "Deployment" }} />
+      <Drawer.Screen name="deployment" options={{ title: "Devices" }} />
       <Drawer.Screen name="logs" options={{ title: "Logs" }} />
       <Drawer.Screen name="sos" options={{ title: "SOS Requests" }} />
       <Drawer.Screen name="profile" options={{ title: "Profile" }} />
+      <Drawer.Screen name="complete-profile" options={{ drawerItemStyle: { display: 'none' }, headerShown: false }} />
     </Drawer>
   );
 }

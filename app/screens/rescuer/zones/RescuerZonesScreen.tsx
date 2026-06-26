@@ -1,426 +1,218 @@
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   ActivityIndicator,
-  Modal,
   ScrollView,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
+  RefreshControl,
+  TouchableOpacity,
+  SafeAreaView
 } from "react-native";
 import Navbar from "../components/RescuerNavbar";
-import { createZone, getZonesMap, deleteZone } from "@/app/services/api";
+import { getZonesMap } from "@/app/services/api";
 import { Ionicons } from "@expo/vector-icons";
-import { auth } from "@/app/config/firebase";
-import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-
-const emptyForm = {
-  name: "",
-  lat: "",
-  lng: "",
-  radius_m: "",
-  priority: "medium",
-};
+import { auth, db } from "@/app/config/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 const RescuerZonesScreen = () => {
   const [zones, setZones] = useState<any[]>([]);
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
-  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
-
-  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
-  const [deleteTargetName, setDeleteTargetName] = useState("");
-  const [password, setPassword] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"org" | "global">("org");
+  const [expandedZoneId, setExpandedZoneId] = useState<number | null>(null);
 
   useEffect(() => {
-    loadZones();
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        loadUserOrgAndZones(user.uid);
+      }
+    });
+    return () => unsub();
   }, []);
+
+  const loadUserOrgAndZones = async (uid: string) => {
+    setLoading(true);
+    
+    // Get rescuer's org ID
+    if (uid) {
+      const userDoc = await getDoc(doc(db, "users", uid));
+      if (userDoc.exists() && userDoc.data().organization_id) {
+        setOrgId(String(userDoc.data().organization_id));
+      }
+    }
+    
+    await loadZones();
+  };
 
   const loadZones = async () => {
     const data = await getZonesMap();
     setZones(data?.zones || []);
+    setLoading(false);
   };
 
-  const updateForm = (key: string, value: string) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleCreateZone = async () => {
-    if (!form.name || !form.lat || !form.lng || !form.radius_m) {
-      Alert.alert("Missing Data", "Please fill all zone fields.");
-      return;
-    }
-
-    const payload = {
-      name: form.name.trim(),
-      lat: Number(form.lat),
-      lng: Number(form.lng),
-      radius_m: Number(form.radius_m),
-      priority: form.priority.trim().toLowerCase() || "medium",
-    };
-
-    if (
-      Number.isNaN(payload.lat) ||
-      Number.isNaN(payload.lng) ||
-      Number.isNaN(payload.radius_m)
-    ) {
-      Alert.alert("Invalid Coordinates", "Latitude, longitude, and radius must be numbers.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const result = await createZone(payload);
-
-      if (result?.detail || result?.error) {
-        Alert.alert("Zone Not Created", String(result.detail || result.error));
-        return;
-      }
-
-      setForm(emptyForm);
-      await loadZones();
-      Alert.alert("Zone Created", `${payload.name} is ready for deployment.`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const initiateDelete = (zoneId: number, name: string) => {
-    Alert.alert(
-      "Confirm Deletion",
-      `Are you sure you want to permanently delete the zone "${name}"? All assigned gateways, nodes, and alerts in this zone will be deleted permanently.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            setDeleteTargetId(zoneId);
-            setDeleteTargetName(name);
-            setPassword("");
-            setPasswordModalVisible(true);
-          },
-        },
-      ]
-    );
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!password) {
-      Alert.alert("Error", "Please enter your password.");
-      return;
-    }
-
+  const onRefresh = async () => {
+    setRefreshing(true);
     const user = auth.currentUser;
-    if (!user || !user.email) {
-      Alert.alert("Error", "You are not logged in.");
-      return;
-    }
-
-    try {
-      setDeleting(true);
-
-      const credential = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, credential);
-
-      if (deleteTargetId !== null) {
-        const result = await deleteZone(deleteTargetId);
-        if (result?.error || result?.detail) {
-          throw new Error(result.error || result.detail);
-        }
-        Alert.alert("Success", `Zone "${deleteTargetName}" deleted successfully.`);
-      }
-
-      setPasswordModalVisible(false);
-      setDeleteTargetId(null);
-      setDeleteTargetName("");
-      setPassword("");
+    if (user) {
+      await loadUserOrgAndZones(user.uid);
+    } else {
       await loadZones();
-    } catch (err: any) {
-      console.log("Delete error:", err);
-      const msg = err?.code === "auth/invalid-credential" || err?.code === "auth/wrong-password"
-        ? "Incorrect password. Verification failed."
-        : err?.message || "Verification failed. Please try again.";
-      Alert.alert("Authentication Failed", msg);
-    } finally {
-      setDeleting(false);
+    }
+    setRefreshing(false);
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case "high":
+        return "#EF4444";
+      case "medium":
+        return "#EAB308";
+      case "low":
+        return "#22C55E";
+      default:
+        return "#9CA3AF";
     }
   };
+
+  const getStatusColor = (status: string) => {
+    if (!status) return "#9CA3AF";
+    switch (status.toLowerCase()) {
+      case "online": return "#22C55E";
+      case "sos": return "#EF4444";
+      case "flood": return "#3B82F6";
+      case "lost": return "#F59E0B";
+      default: return "#9CA3AF";
+    }
+  };
+
+  const filteredZones = zones.filter((z) => {
+    if (activeTab === "org") {
+      if (!orgId) return false;
+      return String(z.organization_id) === String(orgId);
+    } else {
+      return z.organization_id === null || z.organization_id === undefined;
+    }
+  });
 
   return (
-    <View className="flex-1 bg-[#F4F6FA]">
-      <Navbar />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6", paddingTop: 100 }}>
+      <Navbar title="Active Zones" />
 
-      <ScrollView contentContainerStyle={{ paddingTop: 100, paddingBottom: 40 }}>
-        <View className="px-5">
-          <Text className="text-3xl font-extrabold text-gray-900">
-            Zone Management
-          </Text>
-          <Text className="text-gray-500 mt-1 mb-5">
-            Create flood monitoring zones and review current coverage.
-          </Text>
+      {/* TABS */}
+      <View style={{ flexDirection: "row", padding: 16, backgroundColor: "white", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 3, elevation: 2 }}>
+        <TouchableOpacity 
+          style={{ flex: 1, paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: activeTab === "org" ? "#2563EB" : "transparent", alignItems: "center" }}
+          onPress={() => { setActiveTab("org"); setExpandedZoneId(null); }}
+        >
+          <Text style={{ fontWeight: "bold", color: activeTab === "org" ? "#2563EB" : "#6B7280" }}>Organization</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={{ flex: 1, paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: activeTab === "global" ? "#2563EB" : "transparent", alignItems: "center" }}
+          onPress={() => { setActiveTab("global"); setExpandedZoneId(null); }}
+        >
+          <Text style={{ fontWeight: "bold", color: activeTab === "global" ? "#2563EB" : "#6B7280" }}>Global</Text>
+        </TouchableOpacity>
+      </View>
 
-          {/* CREATE ZONE CARD */}
-          <View className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm mb-6">
-            <Text className="text-xl font-bold text-gray-900 mb-4">
-              Create Zone
-            </Text>
-
-            <Input label="Zone Name" value={form.name} onChangeText={(v: string) => updateForm("name", v)} placeholder="e.g. Sector-A Flood Alert" />
-            
-            <View className="flex-row gap-4 mb-1">
-              <View className="flex-1">
-                <Input label="Latitude" value={form.lat} keyboardType="decimal-pad" onChangeText={(v: string) => updateForm("lat", v)} placeholder="e.g. 24.8607" />
-              </View>
-              <View className="flex-1">
-                <Input label="Longitude" value={form.lng} keyboardType="decimal-pad" onChangeText={(v: string) => updateForm("lng", v)} placeholder="e.g. 67.0011" />
-              </View>
-            </View>
-
-            <View className="flex-row gap-4 mb-1" style={{ zIndex: 1000 }}>
-              <View className="flex-1">
-                <Input label="Radius (meters)" value={form.radius_m} keyboardType="numeric" onChangeText={(v: string) => updateForm("radius_m", v)} placeholder="e.g. 500" />
-              </View>
-              <View className="flex-1 relative">
-                <Text style={{ color: "#475569", fontWeight: "600", marginBottom: 6, fontSize: 14 }}>Priority</Text>
-                <TouchableOpacity
-                  onPress={() => setShowPriorityDropdown(!showPriorityDropdown)}
-                  activeOpacity={0.7}
-                  style={{
-                    backgroundColor: "#F8FAFC",
-                    borderWidth: 1,
-                    borderColor: "#E2E8F0",
-                    borderRadius: 16,
-                    paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    height: 48,
-                  }}
-                >
-                  <Text style={{ color: "#0F172A", fontSize: 15, textTransform: 'capitalize', fontWeight: '500' }}>
-                    {form.priority}
-                  </Text>
-                  <Ionicons name="chevron-down" size={16} color="#64748B" />
-                </TouchableOpacity>
-
-                {showPriorityDropdown && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 72,
-                      left: 0,
-                      right: 0,
-                      backgroundColor: 'white',
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      borderRadius: 16,
-                      shadowColor: '#000',
-                      shadowOpacity: 0.05,
-                      shadowRadius: 10,
-                      elevation: 5,
-                      zIndex: 2000,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {["high", "medium", "low"].map((p) => (
-                      <TouchableOpacity
-                        key={p}
-                        onPress={() => {
-                          updateForm("priority", p);
-                          setShowPriorityDropdown(false);
-                        }}
-                        style={{
-                          paddingHorizontal: 16,
-                          paddingVertical: 12,
-                          borderBottomWidth: p !== "low" ? 1 : 0,
-                          borderBottomColor: '#F1F5F9',
-                          backgroundColor: form.priority === p ? '#F1F5F9' : 'white',
-                        }}
-                      >
-                        <Text style={{ fontSize: 15, color: '#0F172A', fontWeight: form.priority === p ? '700' : '500', textTransform: 'capitalize' }}>
-                          {p}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </View>
-
-            <TouchableOpacity
-              disabled={saving}
-              onPress={handleCreateZone}
-              className={`mt-3 rounded-2xl py-4 shadow-sm ${saving ? "bg-gray-400" : "bg-blue-600"}`}
-            >
-              <Text className="text-white text-center font-bold">
-                {saving ? "Creating..." : "Create Zone"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* EXISTING ZONES LIST */}
-          <Text className="text-xl font-bold text-gray-900 mb-4">
-            Existing Zones
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#2563EB" />
+        </View>
+      ) : (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          <Text style={{ fontSize: 14, color: "#6B7280", marginBottom: 12, marginLeft: 4 }}>
+            {filteredZones.length} {activeTab === "org" ? "Organization" : "Global"} Zones Active
           </Text>
 
-          {zones.length === 0 ? (
-            <View className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm items-center">
-              <Ionicons name="map-outline" size={48} color="#94A3B8" />
-              <Text className="text-gray-400 font-semibold mt-4 text-center">No zones created yet</Text>
-            </View>
-          ) : (
-            zones.map((zone) => (
-              <View
+          {filteredZones.map((zone) => {
+            const isExpanded = expandedZoneId === zone.id;
+
+            return (
+              <TouchableOpacity
                 key={zone.id}
-                className="bg-white rounded-2xl p-5 mb-4 border border-gray-100 shadow-sm"
+                onPress={() => setExpandedZoneId(isExpanded ? null : zone.id)}
+                style={{
+                  backgroundColor: "white",
+                  padding: 16,
+                  borderRadius: 12,
+                  marginBottom: 12,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.05,
+                  shadowRadius: 5,
+                  elevation: 2,
+                }}
               >
-                <View className="flex-row justify-between items-start">
-                  <View className="flex-1 pr-2">
-                    <Text className="text-lg font-bold text-gray-900">
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View>
+                    <Text style={{ fontSize: 16, fontWeight: "bold", color: "#1F2937" }}>
                       {zone.name}
                     </Text>
-                    <Text className="text-gray-500 mt-1 text-xs font-semibold">
-                      📍 {Number(zone.lat).toFixed(4)}, {Number(zone.lng).toFixed(4)}
+                    <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>
+                      ID: {zone.id}
                     </Text>
                   </View>
-
-                  <View className="flex-row items-center gap-3">
-                    <View 
-                      className={`px-3 py-1 rounded-full ${
-                        zone.state === "SAFE" ? "bg-green-50 border border-green-100" :
-                        zone.state === "FLOOD" || zone.state === "SOS" ? "bg-red-50 border border-red-100" :
-                        zone.state === "WARNING" ? "bg-orange-50 border border-orange-100" :
-                        zone.state === "LOST" ? "bg-amber-50 border border-amber-100" : "bg-gray-50 border border-gray-100"
-                      }`}
-                    >
-                      <Text 
-                        className={`text-[10px] font-extrabold tracking-wider ${
-                          zone.state === "SAFE" ? "text-green-700" :
-                          zone.state === "FLOOD" || zone.state === "SOS" ? "text-red-700" :
-                          zone.state === "WARNING" ? "text-orange-700" :
-                          zone.state === "LOST" ? "text-amber-700" : "text-gray-700"
-                        }`}
-                      >
-                        {zone.state === "SAFE" ? "SAFE" :
-                         zone.state === "FLOOD" ? "FLOOD" :
-                         zone.state === "SOS" ? "SOS" :
-                         zone.state === "WARNING" ? "WARNING" :
-                         zone.state === "LOST" ? "LOST" : zone.state || "UNKNOWN"}
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity 
-                      onPress={() => initiateDelete(zone.id, zone.name)} 
-                      activeOpacity={0.7}
-                      className="p-1"
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
-                    </TouchableOpacity>
+                  <View
+                    style={{
+                      backgroundColor: getPriorityColor(zone.priority),
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text style={{ color: "white", fontSize: 10, fontWeight: "bold", textTransform: "uppercase" }}>
+                      {zone.priority}
+                    </Text>
                   </View>
                 </View>
 
-                <View className="h-[1px] bg-gray-100 my-3" />
+                {isExpanded && (
+                  <View style={{ marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: "#E5E7EB" }}>
+                    
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 12 }}>
+                      <Text style={{ fontSize: 14, color: "#6B7280" }}>Status</Text>
+                      <View style={{ backgroundColor: getStatusColor(zone.state), paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: "bold", color: "white", textTransform: "uppercase" }}>
+                           {zone.state || "UNKNOWN"}
+                        </Text>
+                      </View>
+                    </View>
 
-                <View className="flex-row justify-between text-xs text-gray-500 font-semibold">
-                  <Text className="text-gray-500">
-                    Radius: <Text className="text-gray-800 font-bold">{zone.radius_m}m</Text>
-                  </Text>
-                  <Text className="text-gray-500">
-                    Priority: <Text className="text-gray-800 font-bold capitalize">{zone.priority}</Text>
-                  </Text>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                      <Text style={{ fontSize: 14, color: "#6B7280" }}>Coordinates</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "500", color: "#374151" }}>{zone.lat.toFixed(4)}, {zone.lng.toFixed(4)}</Text>
+                    </View>
 
-      {/* ================= PASSWORD CONFIRMATION MODAL ================= */}
-      <Modal visible={passwordModalVisible} transparent animationType="fade">
-        <View className="flex-1 bg-black/50 justify-center p-6">
-          <View className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
-            <Text className="text-xl font-bold text-gray-900 mb-2">
-              Security Verification
-            </Text>
-            <Text className="text-gray-500 mb-5">
-              Enter your password to permanently delete the zone "{deleteTargetName}". This action cannot be undone and will delete all associated alerts and devices.
-            </Text>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                      <Text style={{ fontSize: 14, color: "#6B7280" }}>Radius</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "500", color: "#374151" }}>{zone.radius_m} meters</Text>
+                    </View>
 
-            <TextInput
-              secureTextEntry
-              autoFocus
-              style={{
-                backgroundColor: "#F8FAFC",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                borderRadius: 16,
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                color: "#0F172A",
-                fontSize: 15,
-                marginBottom: 20
-              }}
-              placeholder="Enter password"
-              placeholderTextColor="#94A3B8"
-              value={password}
-              onChangeText={setPassword}
-            />
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                      <Text style={{ fontSize: 14, color: "#6B7280" }}>Total Devices</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "500", color: "#374151" }}>{zone.total_devices || 0}</Text>
+                    </View>
 
-            <View className="flex-row justify-end gap-3">
-              <TouchableOpacity
-                onPress={() => {
-                  setPasswordModalVisible(false);
-                  setDeleteTargetId(null);
-                  setDeleteTargetName("");
-                  setPassword("");
-                }}
-                className="bg-gray-100 px-5 py-3 rounded-xl"
-              >
-                <Text className="text-gray-700 font-bold">Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                disabled={deleting}
-                onPress={handleConfirmDelete}
-                className="bg-red-600 px-5 py-3 rounded-xl flex-row items-center justify-center min-w-[100px]"
-              >
-                {deleting ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text className="text-white font-bold text-center">Delete Zone</Text>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 14, color: "#6B7280" }}>Lost Devices</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "500", color: (zone.lost_devices > 0) ? "#EF4444" : "#374151" }}>
+                        {zone.lost_devices || 0}
+                      </Text>
+                    </View>
+                  </View>
                 )}
               </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+            );
+          })}
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 };
-
-const Input = ({ label, ...props }: any) => (
-  <View style={{ marginBottom: 14 }}>
-    <Text style={{ color: "#475569", fontWeight: "600", marginBottom: 6, fontSize: 14 }}>{label}</Text>
-    <TextInput
-      {...props}
-      style={{
-        backgroundColor: "#F8FAFC",
-        borderWidth: 1,
-        borderColor: "#E2E8F0",
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        color: "#0F172A",
-        fontSize: 15,
-      }}
-      placeholderTextColor="#94A3B8"
-    />
-  </View>
-);
 
 export default RescuerZonesScreen;

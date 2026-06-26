@@ -416,7 +416,7 @@ const RescuerDashboard = () => {
           <View className="mb-6">
             <View className="flex-row justify-between items-center mb-3">
               <Text className="text-xl font-bold text-gray-900 tracking-tight">
-                Zone Coverage
+                Zone Coverage (Global)
               </Text>
               <Text className="text-xs text-gray-400 font-bold">
                 {zones.length} {zones.length === 1 ? "Zone" : "Zones"} total

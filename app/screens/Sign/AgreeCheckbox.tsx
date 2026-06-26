@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, TouchableOpacity, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import TermsModal from "../../components/TermsModal";
 
 interface AgreeCheckboxProps {
   agree: boolean;
@@ -9,6 +10,7 @@ interface AgreeCheckboxProps {
 
 const AgreeCheckbox: React.FC<AgreeCheckboxProps> = ({ agree, onToggle }) => {
   const { width, height } = useWindowDimensions();
+  const [showTerms, setShowTerms] = useState(false);
 
   // Responsive sizes based on screen width
   const checkboxSize = width * 0.055; // Scales proportionally
@@ -16,45 +18,55 @@ const AgreeCheckbox: React.FC<AgreeCheckboxProps> = ({ agree, onToggle }) => {
   const fontSize = width * 0.032;
 
   return (
-    <TouchableOpacity 
-      onPress={onToggle} 
-      activeOpacity={0.7}
+    <View 
       style={{ 
         marginTop: height * 0.01, 
         marginBottom: height * 0.03 
       }} 
       className="flex-row items-center"
     >
-      <View 
-        style={{ 
-          width: checkboxSize, 
-          height: checkboxSize, 
-          borderRadius: 4, // Keeps consistent corner rounding
-          borderWidth: 1.5,
-          borderColor: 'white',
-          marginRight: width * 0.03,
-          backgroundColor: agree ? 'white' : 'transparent'
-        }} 
-        className="items-center justify-center"
+      <TouchableOpacity 
+        onPress={onToggle} 
+        activeOpacity={0.7}
       >
-        {agree && (
-          <Ionicons 
-            name="checkmark" 
-            size={iconSize} 
-            color="#1A4BCC" // Matching your theme color
-          />
-        )}
+        <View 
+          style={{ 
+            width: checkboxSize, 
+            height: checkboxSize, 
+            borderRadius: 4, 
+            borderWidth: 1.5,
+            borderColor: 'white',
+            marginRight: width * 0.03,
+            backgroundColor: agree ? 'white' : 'transparent'
+          }} 
+          className="items-center justify-center"
+        >
+          {agree && (
+            <Ionicons 
+              name="checkmark" 
+              size={iconSize} 
+              color="#1A4BCC" 
+            />
+          )}
+        </View>
+      </TouchableOpacity>
+
+      <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
+        <TouchableOpacity onPress={onToggle} activeOpacity={0.7}>
+          <Text style={{ color: 'white', fontSize: fontSize, lineHeight: fontSize * 1.4 }}>
+            I agree to the{" "}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity onPress={() => setShowTerms(true)} activeOpacity={0.7}>
+          <Text style={{ color: 'white', fontSize: fontSize, lineHeight: fontSize * 1.4, fontWeight: 'bold', textDecorationLine: 'underline' }}>
+            Terms and Conditions
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={{ flex: 1 }}>
-        <Text 
-          style={{ fontSize: fontSize }} 
-          className="text-white/90 leading-tight"
-        >
-          I agree to the <Text className="font-bold underline">Terms of Service</Text> and <Text className="font-bold underline">Privacy Policy</Text>
-        </Text>
-      </View>
-    </TouchableOpacity>
+      <TermsModal visible={showTerms} onClose={() => setShowTerms(false)} />
+    </View>
   );
 };
 

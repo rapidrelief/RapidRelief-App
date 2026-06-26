@@ -6,6 +6,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Modal,
+  SafeAreaView,
+  Platform,
+  StatusBar,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { auth, db } from "@/app/config/firebase";
@@ -55,13 +58,7 @@ export default function RescuerProfile() {
 
   if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
+      <View className="flex-1 justify-center items-center bg-gray-50">
         <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
@@ -69,337 +66,147 @@ export default function RescuerProfile() {
 
   if (!userData) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text>No profile data found</Text>
+      <View className="flex-1 justify-center items-center bg-gray-50">
+        <Text className="text-gray-500 font-bold">No profile data found</Text>
       </View>
     );
   }
 
+  const initial = userData.fullName ? userData.fullName.charAt(0).toUpperCase() : "R";
+
   return (
-    <View style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
-      <ScrollView>
-       {/* ================= HEADER ================= */}
-<View
-  style={{
-    backgroundColor: "#2563EB",
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  }}
->
-  {/* TOP ROW */}
-  <View
-    style={{
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-    }}
-  >
-    {/* MENU BUTTON */}
-    <TouchableOpacity
-      onPress={() => navigation.openDrawer()}
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: 10,
-        backgroundColor: "rgba(255,255,255,0.15)",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
+    <SafeAreaView 
+      className="flex-1 bg-gray-50" 
+      style={{ paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }}
     >
-      <Ionicons name="menu" size={24} color="white" />
-    </TouchableOpacity>
+      {/* ================= HEADER ================= */}
+      <View className="px-6 py-4 flex-row justify-between items-center bg-gray-50">
+        <TouchableOpacity
+          onPress={() => navigation.openDrawer()}
+          className="w-10 h-10 rounded-xl bg-white border border-gray-200 items-center justify-center shadow-sm"
+        >
+          <Ionicons name="menu" size={24} color="#111827" />
+        </TouchableOpacity>
+        
+        <Text className="text-xl font-bold text-gray-900 tracking-tight">
+          My Profile
+        </Text>
+        
+        <View className="w-10 h-10" />
+      </View>
 
-    <Text
-      style={{
-        color: "white",
-        fontSize: 22,
-        fontWeight: "bold",
-      }}
-    >
-      Profile
-    </Text>
-
-    {/* Empty spacer to center title */}
-    <View style={{ width: 40 }} />
-  </View>
-
-  {/* USER INFO */}
-  <View
-    style={{
-      marginTop: 16,
-      backgroundColor: "rgba(255,255,255,0.12)",
-      borderRadius: 16,
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-    }}
-  >
-    <Text
-      style={{
-        color: "white",
-        fontSize: 17,
-        fontWeight: "bold",
-      }}
-    >
-      {userData.fullName}
-    </Text>
-
-    <Text
-      style={{
-        color: "#DBEAFE",
-        fontSize: 13,
-        marginTop: 2,
-      }}
-    >
-      Rescuer ID: {userData.rescuerId}
-    </Text>
-  </View>
-</View>
-        {/* ================= DETAILS CARD ================= */}
-        <View style={{ padding: 20 }}>
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 20,
-              padding: 18,
-              shadowColor: "#000",
-              shadowOpacity: 0.08,
-              shadowRadius: 10,
-              elevation: 3,
-            }}
-          >
-            <ProfileItem
-              icon="mail-outline"
-              label="Email"
-              value={userData.email}
-            />
-
-            <ProfileItem
-              icon="call-outline"
-              label="Phone"
-              value={userData.phone}
-            />
-
-            <ProfileItem
-              icon="person-outline"
-              label="Role"
-              value={userData.role}
-            />
-
-            <ProfileItem
-              icon="card-outline"
-              label="CNIC"
-              value={userData.cnic}
-            />
-
-            <ProfileItem
-              icon="location-outline"
-              label="Address"
-              value={userData.address}
-            />
-
-            <ProfileItem
-              icon="pulse-outline"
-              label="Status"
-              value="Active Rescuer"
-            />
-
-            {/* ================= DELETE ACCOUNT ================= */}
-            <TouchableOpacity
-              onPress={() => setModalVisible(true)}
-              style={{
-                marginTop: 20,
-                backgroundColor: "#111827",
-                paddingVertical: 14,
-                borderRadius: 14,
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  color: "white",
-                  fontWeight: "bold",
-                }}
-              >
-                Delete Account
-              </Text>
-            </TouchableOpacity>
-
-            <Text
-              style={{
-                marginTop: 8,
-                fontSize: 12,
-                color: "#6B7280",
-                textAlign: "center",
-              }}
-            >
-              Account deletion requests must be handled by an administrator.
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        
+        {/* ================= AVATAR & INFO ================= */}
+        <View className="items-center mt-6 mb-8 px-6">
+          <View className="w-24 h-24 rounded-full bg-blue-100 border-4 border-white shadow-sm items-center justify-center mb-4">
+            <Text className="text-4xl font-black text-blue-600">{initial}</Text>
+          </View>
+          
+          <Text className="text-2xl font-bold text-gray-900 tracking-tight text-center">
+            {userData.fullName}
+          </Text>
+          <View className="bg-blue-50 px-3 py-1 rounded-full mt-2 border border-blue-100 flex-row items-center">
+            <View className="w-2 h-2 rounded-full bg-blue-500 mr-2" />
+            <Text className="text-blue-700 font-bold text-xs uppercase tracking-wider">
+              ID: {userData.rescuerId}
             </Text>
           </View>
         </View>
-      </ScrollView>
 
-      {/* ================= LOGOUT BAR ================= */}
-      <View
-        style={{
-          backgroundColor: "#C10F0F",
-          paddingVertical: 20,
-          paddingHorizontal: 20,
-          borderTopLeftRadius: 25,
-          borderTopRightRadius: 25,
-        }}
-      >
-        <TouchableOpacity
-          onPress={handleLogout}
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Ionicons name="log-out-outline" size={22} color="#fff" />
+        {/* ================= QUICK STATS ================= */}
+        <View className="flex-row px-6 mb-6 justify-between gap-4">
+          <View className="flex-1 bg-white rounded-3xl p-5 border border-gray-100 shadow-sm items-center">
+            <View className="w-12 h-12 rounded-2xl bg-green-50 items-center justify-center mb-3">
+              <Ionicons name="shield-checkmark" size={24} color="#22C55E" />
+            </View>
+            <Text className="text-xs text-gray-400 font-bold uppercase tracking-wider">Status</Text>
+            <Text className="text-gray-900 font-black mt-1 text-base">Active Duty</Text>
+          </View>
 
-          <Text
-            style={{
-              color: "#fff",
-              fontWeight: "bold",
-              marginLeft: 2,
-              fontSize: 16,
-            }}
+          <View className="flex-1 bg-white rounded-3xl p-5 border border-gray-100 shadow-sm items-center">
+            <View className="w-12 h-12 rounded-2xl bg-blue-50 items-center justify-center mb-3">
+              <Ionicons name="business" size={24} color="#3B82F6" />
+            </View>
+            <Text className="text-xs text-gray-400 font-bold uppercase tracking-wider">Organization</Text>
+            <Text className="text-gray-900 font-black mt-1 text-base text-center" numberOfLines={1}>
+              {userData.organization_name || "Independent"}
+            </Text>
+          </View>
+        </View>
+
+        {/* ================= DETAILS ================= */}
+        <View className="px-6 mb-6">
+          <Text className="text-gray-900 font-bold text-lg mb-4 ml-1">Personal Details</Text>
+          <View className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <ProfileItem icon="mail" label="Email" value={userData.email} />
+            <ProfileItem icon="call" label="Phone" value={userData.phone} />
+            <ProfileItem icon="person" label="Role" value={userData.role} />
+            <ProfileItem icon="card" label="CNIC" value={userData.cnic} />
+            <ProfileItem icon="location" label="Address" value={userData.address} noBorder />
+          </View>
+        </View>
+
+        {/* ================= ACTIONS ================= */}
+        <View className="px-6 space-y-4">
+          <TouchableOpacity
+            onPress={handleLogout}
+            className="w-full bg-red-50 border border-red-200 py-4 rounded-2xl flex-row items-center justify-center gap-2 mb-3"
           >
-            Logout
-          </Text>
-        </TouchableOpacity>
+            <Ionicons name="log-out-outline" size={20} color="#DC2626" />
+            <Text className="text-red-600 font-extrabold text-base">Sign Out</Text>
+          </TouchableOpacity>
 
-        <Text
-          style={{
-            textAlign: "center",
-            color: "#FECACA",
-            marginTop: 6,
-            fontSize: 12,
-          }}
-        >
-          Press to securely logout of your account
-        </Text>
-      </View>
+          <TouchableOpacity
+            onPress={() => setModalVisible(true)}
+            className="w-full py-4 rounded-2xl flex-row items-center justify-center gap-2"
+          >
+            <Ionicons name="trash-outline" size={18} color="#9CA3AF" />
+            <Text className="text-gray-400 font-bold text-sm">Delete Account</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* ================= DELETE ACCOUNT POPUP ================= */}
       <Modal visible={modalVisible} transparent animationType="fade">
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 20,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 20,
-              padding: 20,
-              width: "100%",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "bold",
-                marginBottom: 10,
-              }}
-            >
-              Delete Account
+        <View className="flex-1 bg-black/50 justify-center px-6">
+          <View className="bg-white rounded-3xl p-6 shadow-xl">
+            <View className="w-12 h-12 rounded-full bg-red-50 items-center justify-center mb-4 self-center">
+              <Ionicons name="warning" size={24} color="#DC2626" />
+            </View>
+            
+            <Text className="text-xl font-bold text-center text-gray-900 mb-2">
+              Cannot Delete Account
             </Text>
 
-            <Text
-              style={{
-                color: "#6B7280",
-                lineHeight: 22,
-              }}
-            >
-              Account deletion is not available from the mobile application.
-              Please contact the system administrator to permanently remove
-              your account.
+            <Text className="text-gray-500 text-center mb-6 leading-relaxed">
+              Account deletion is strictly disabled in the mobile app for security compliance. Please contact your system administrator to securely terminate your rescuer profile.
             </Text>
 
             <TouchableOpacity
               onPress={() => setModalVisible(false)}
-              style={{
-                marginTop: 20,
-                backgroundColor: "#2563EB",
-                padding: 12,
-                borderRadius: 12,
-              }}
+              className="bg-gray-900 py-4 rounded-2xl w-full"
             >
-              <Text
-                style={{
-                  color: "white",
-                  textAlign: "center",
-                  fontWeight: "bold",
-                }}
-              >
-                OK
-              </Text>
+              <Text className="text-white text-center font-bold text-base">Understood</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 // ================= REUSABLE ROW =================
-
-const ProfileItem = ({ icon, label, value }: any) => {
+const ProfileItem = ({ icon, label, value, noBorder = false }: any) => {
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: "#F1F5F9",
-      }}
-    >
-      <Ionicons name={icon} size={20} color="#2563EB" />
+    <View className={`flex-row items-center p-4 ${noBorder ? "" : "border-b border-gray-50"}`}>
+      <View className="w-10 h-10 rounded-full bg-blue-50 items-center justify-center border border-blue-100">
+        <Ionicons name={icon} size={18} color="#2563EB" />
+      </View>
 
-      <View
-        style={{
-          marginLeft: 12,
-          flex: 1,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 12,
-            color: "#6B7280",
-          }}
-        >
-          {label}
-        </Text>
-
-        <Text
-          style={{
-            fontSize: 15,
-            fontWeight: "600",
-            color: "#111827",
-          }}
-        >
-          {value || "N/A"}
-        </Text>
+      <View className="ml-4 flex-1">
+        <Text className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-0.5">{label}</Text>
+        <Text className="text-sm font-bold text-gray-900" numberOfLines={1}>{value || "N/A"}</Text>
       </View>
     </View>
   );

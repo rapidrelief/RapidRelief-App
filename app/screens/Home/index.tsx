@@ -1,11 +1,8 @@
 import { useRouter } from "expo-router";
 import React from "react";
-import {
-  ScrollView,
-  StatusBar,
-  View,
-  useWindowDimensions
-} from "react-native";
+import { StatusBar, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 
 import Header from "./Header";
 import HeroImage from "./HeroImage";
@@ -13,45 +10,45 @@ import HomeButton from "./HomeButton";
 import WelcomeText from "./WelcomeText";
 
 const HomeScreen = () => {
-  const { height: screenHeight } = useWindowDimensions();
   const router = useRouter();
 
   return (
-    // The background color here fills the whole screen
-    <View style={{ flex: 1, backgroundColor: "#1A4BCC" }}>
-      <StatusBar
-        barStyle="light-content" // White icons for blue background
-        translucent={true} // Bleeds background into status bar
-        backgroundColor="transparent"
-      />
+    <LinearGradient 
+      colors={['#0F172A', '#1E3A8A', '#1A4BCC']} 
+      style={{ flex: 1 }}
+    >
+      <StatusBar barStyle="light-content" translucent={true} backgroundColor="transparent" />
 
-      <ScrollView
-        contentContainerStyle={{ height: screenHeight }}
-        bounces={false}
-        scrollEnabled={false}
-      >
-        {/* Your percentage-based layout remains exactly as is */}
-        <View style={{ height: screenHeight * 0.3 }}>
-          <Header />
-        </View>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+        <View style={{ flex: 1, paddingVertical: 10 }}>
+          
+          {/* Header gets some top breathing room */}
+          <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <Header />
+          </View>
 
-        <View style={{ height: screenHeight * 0.2 }}>
-          <HeroImage />
-        </View>
+          {/* Hero image is the most flexible, can shrink on smaller screens */}
+          <View style={{ flex: 2, justifyContent: 'center', alignItems: 'center' }}>
+            <HeroImage />
+          </View>
 
-        <View style={{ height: screenHeight * 0.15 }}>
-          <WelcomeText />
-        </View>
+          {/* Welcome Text stays cleanly above the buttons */}
+          <View style={{ justifyContent: 'center', marginBottom: 30 }}>
+            <WelcomeText />
+          </View>
 
-        <View style={{ height: screenHeight * 0.35 }}>
-          <HomeButton
-            onLogin={() => router.push("/auth/Login")}
-            onSignUp={() => router.push("/auth/SignUp")}
-            onOfflineSos={() => router.push("/auth/OfflineSOS")}
-          />
+          {/* Buttons take their natural height at the bottom */}
+          <View style={{ paddingBottom: 10 }}>
+            <HomeButton
+              onLogin={() => router.push("/auth/Login")}
+              onSignUp={() => router.push("/auth/SignUp")}
+              onOfflineSos={() => router.push("/auth/OfflineSOS")}
+            />
+          </View>
+
         </View>
-      </ScrollView>
-    </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 

@@ -48,8 +48,6 @@ const WelcomeText: React.FC<WelcomeTextProps> = ({
   return (
     <View 
       style={{ 
-        flex: 1, 
-        backgroundColor: "#1A4BCC", 
         alignItems: "center", 
         justifyContent: "center",
         paddingHorizontal: screenWidth * 0.05 

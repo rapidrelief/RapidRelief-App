@@ -6,7 +6,7 @@ const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
 export const getZonesMap = async () => {
     try{
-        const res = await fetch(apiUrl("/api/zones/map"));
+        const res = await fetch(apiUrl(`/api/zones/map?_t=${Date.now()}`));
         const json = await res.json();
         return json;
     }catch (err) {
@@ -17,7 +17,7 @@ export const getZonesMap = async () => {
 
 export const getDashboardData = async () => {
     try{
-        const res = await fetch(apiUrl("/api/zones/map"));
+        const res = await fetch(apiUrl(`/api/zones/map?_t=${Date.now()}`));
         const json = await res.json();
         return json;
     }catch (err) {

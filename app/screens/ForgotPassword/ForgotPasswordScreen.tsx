@@ -1,19 +1,27 @@
 import React from "react";
-import { SafeAreaView, StatusBar, KeyboardAvoidingView, Platform } from "react-native";
+import { StatusBar, KeyboardAvoidingView, Platform } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
 import Reset from "./Reset";
 
 const ForgotPasswordScreen = () => {
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#1A4BCC" }}>
-      <StatusBar barStyle="light-content" />
+    <LinearGradient 
+      colors={['#0F172A', '#1E3A8A', '#1A4BCC']} 
+      style={{ flex: 1 }}
+    >
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <Reset />
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        >
+          <Reset />
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 };
 
