@@ -3,6 +3,7 @@ import { View, ScrollView } from 'react-native';
 import Navbar from './Navbar';
 // NOTE: We no longer import Sidebar here because it's handled by _layout.tsx
 import Welcome from './Welcome'; 
+import PredictionCard from './PredictionCard';
 import Floodstatus from './Floodstatus';
 import MovementStatus from './Movementstatus';
 import Emergency from './Emergency'; 
@@ -28,6 +29,7 @@ const DashboardScreen = () => {
       >
         <View className="px-5 w-full max-w-[500px] self-center">
           <Welcome />
+          <PredictionCard />
           <Floodstatus />
           <MovementStatus />
           

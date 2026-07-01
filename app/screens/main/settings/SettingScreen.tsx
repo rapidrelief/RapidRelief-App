@@ -31,6 +31,10 @@ const SettingsScreen = ({ onNavigate }: { onNavigate?: (name: string) => void })
         <PrivacySecurity />
         <EmergencyContacts />
         <DangerZone />
+
+        <View className="mt-8 mb-4 items-center">
+          <Text className="text-slate-400 text-sm">Version 1.0.1 (OTA Test)</Text>
+        </View>
       </ScrollView>
 
       {/* FIXED: Removed the local <Sidebar />. 

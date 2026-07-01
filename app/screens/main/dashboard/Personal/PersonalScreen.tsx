@@ -43,6 +43,7 @@ const PersonalScreen = () => {
     phone: "",
     emergency: "",
     address: "",
+    city: "Lahore",
     cnic: "",
   });
 
@@ -53,6 +54,7 @@ const PersonalScreen = () => {
     phone: "",
     emergency: "",
     address: "",
+    city: "Lahore",
     cnic: "",
   });
 
@@ -91,6 +93,7 @@ const PersonalScreen = () => {
           secondary: contacts.secondary || [],
         },
         address: userInfo.address,
+        city: userInfo.city,
       });
 
       setOriginalUserInfo(userInfo);
@@ -172,6 +175,7 @@ useEffect(() => {
           phone: data.phone || "",
           emergency: data.role ==="rescuer" ? "" : (normalizeEmergencyContacts(data).primary || ""),
           address: data.address || "",
+          city: data.city || "Lahore",
           cnic: data.cnic || "",
         };
         setUserInfo(fetchedData);
@@ -258,7 +262,7 @@ useFocusEffect(
             </Text>
             <View className="space-y-1">
               <CustomInputField label="Street Address" value={userInfo.address} icon="map-pin" editable={isEditing}  onChangeText={(text) => setUserInfo({ ...userInfo, address: text })} loading={loading} />
-              <CustomInputField label="City" value="Lahore" icon="map" editable={isEditing} loading={loading} />
+              <CustomInputField label="City" value={userInfo.city} icon="map" editable={isEditing} onChangeText={(text) => setUserInfo({ ...userInfo, city: text })} loading={loading} />
               <CustomInputField label="Country" value="Pakistan" icon="globe" editable={false} loading={loading} />
             </View>
           </View>

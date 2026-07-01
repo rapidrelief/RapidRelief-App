@@ -1,13 +1,19 @@
 export default {
   "expo": {
-    "name": "flood-relief",
-    "slug": "flood-relief",
+    "name": "RapidRelief",
+    "slug": "rapidrelief",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/Loadingicon.png",
     "scheme": "floodrelief",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://u.expo.dev/7022772c-67cf-41aa-b702-5daf1abaf04d"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "splash": {
       "image": "./assets/images/boat3.png",
       "resizeMode": "contain",
@@ -51,6 +57,11 @@ export default {
           "bluetoothAlwaysPermission": "Allow this app to connect to emergency SOS nodes."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7022772c-67cf-41aa-b702-5daf1abaf04d"
+      }
+    }
   }
 };

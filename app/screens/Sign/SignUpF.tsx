@@ -36,6 +36,7 @@ const SignUpF = () => {
     confirmPassword: "",
     emergency: "",
     address: "",
+    city: "",
     cnic: ""
   });
 
@@ -52,6 +53,7 @@ const SignUpF = () => {
     form.password.length >= 6 &&
     form.password === form.confirmPassword &&
     form.address.trim().length >= 5 &&
+    form.city.trim().length >= 2 &&
     form.cnic.length === 13 &&
     form.emergency.length === 11 &&
     agree;
@@ -153,7 +155,8 @@ const SignUpF = () => {
               </Text>
             )}
             
-            <FormInput label="Home Address" placeholder="Street, City, Area" iconName="location-outline" value={form.address} onChangeText={(txt) => handleInput("address", txt)} />
+            <FormInput label="Home Address" placeholder="Street, Area" iconName="location-outline" value={form.address} onChangeText={(txt) => handleInput("address", txt)} />
+            <FormInput label="City" placeholder="Lahore" iconName="business-outline" value={form.city} onChangeText={(txt) => handleInput("city", txt)} />
 
             <View className="mt-2 pt-4 border-t border-white/20">
               <Text className="text-white font-bold mb-4">Emergency Setup</Text>

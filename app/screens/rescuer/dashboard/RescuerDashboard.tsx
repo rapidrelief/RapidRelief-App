@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { completeSOS, createSOS, getActiveSOS, getSOSHistory, getZonesMap } from "@/app/services/api";
 import { subscribeToActiveSOS, subscribeToZones } from "@/app/services/realtimeService";
 import Navbar from "../components/RescuerNavbar";
+import PredictionCard from "../../main/dashboard/PredictionCard";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 
@@ -411,6 +412,8 @@ const RescuerDashboard = () => {
               </Text>
             </View>
           )}
+
+          <PredictionCard />
 
           {/* ================= ZONES GRID SECTION ================= */}
           <View className="mb-6">
