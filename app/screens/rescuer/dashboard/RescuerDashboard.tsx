@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   View,
@@ -8,29 +8,51 @@ import {
   Modal,
   RefreshControl,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { completeSOS, createSOS, getActiveSOS, getSOSHistory, getZonesMap } from "@/app/services/api";
+import { completeSOS, createSOS, getActiveSOS, getSOSHistory, getZonesMap, getMessagesInbox } from "@/app/services/api";
 import { subscribeToActiveSOS, subscribeToZones } from "@/app/services/realtimeService";
 import Navbar from "../components/RescuerNavbar";
 import PredictionCard from "../../main/dashboard/PredictionCard";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-
-// Firebase
+import { generateGlobalAnalysis } from "@/app/services/aiService";
 import { auth, db } from "@/app/config/firebase";
 import { collection, doc, getDoc, getDocs, onSnapshot, updateDoc } from "firebase/firestore";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 type Zone = {
   id: string;
   name: string;
-  state: "FLOOD" | "SAFE" | "NO_SIGNAL" | "WEAK_SIGNAL" | "SOS";
+  state: "FLOOD" | "SAFE" | "NO_SIGNAL" | "WEAK_SIGNAL" | "SOS" | "LOST";
 };
 
 const RescuerDashboard = () => {
   const router = useRouter();
+  const navigation: any = useNavigation();
+
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const checkMessages = async () => {
+        try {
+          const res = await getMessagesInbox();
+          if (res.messages) {
+            const unread = res.messages.some((m: any) => !m.is_read);
+            setHasUnreadMessages(unread);
+          }
+        } catch (err) {
+          console.log("Error fetching inbox:", err);
+        }
+      };
+      checkMessages();
+    }, [])
+  );
 
   const [zones, setZones] = useState<Zone[]>([]);
   const [showAll, setShowAll] = useState(false);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
@@ -61,6 +83,14 @@ const RescuerDashboard = () => {
       setZones(data?.zones || []);
     });
   }, []);
+
+  // ================= AI ANALYSIS =================
+  useEffect(() => {
+    if (zones.length > 0) {
+      setAiSummary(null); // Reset to show loading state if desired, or leave it
+      generateGlobalAnalysis(zones, rescueRequests).then(setAiSummary);
+    }
+  }, [zones, rescueRequests]);
 
   // ================= LOAD USER SOS REQUESTS =================
   useEffect(() => {
@@ -105,7 +135,7 @@ const RescuerDashboard = () => {
         rescuerCoordsRef.current = await updateMyRescuerLocation();
 
         unsubscribe = onSnapshot(
-          collection(db, "users"),
+          query(collection(db, "users"), where("role", "==", "RESCUER")),
           (snap) => {
             rescuerDocsRef.current = snap.docs.map((userDoc) => ({
               id: userDoc.id,
@@ -119,22 +149,27 @@ const RescuerDashboard = () => {
           },
           (err) => {
             console.log("Realtime rescuer fetch error:", err);
-            loadRescuers();
+            setLoadingRescuers(false);
+            // DO NOT call loadRescuers() here, it causes an infinite loop!
           }
         );
       } catch (err) {
         console.log("Rescuer realtime setup error:", err);
-        loadRescuers();
+        setLoadingRescuers(false);
       }
     };
 
     start();
 
     const interval = setInterval(async () => {
-      rescuerCoordsRef.current = await updateMyRescuerLocation();
-      setNearbyRescuers(
-        buildRescuerList(rescuerDocsRef.current, rescuerCoordsRef.current)
-      );
+      try {
+        rescuerCoordsRef.current = await updateMyRescuerLocation();
+        setNearbyRescuers(
+          buildRescuerList(rescuerDocsRef.current, rescuerCoordsRef.current)
+        );
+      } catch (err) {
+        console.log("Interval rescuer update error", err);
+      }
     }, 50000);
 
     return () => {
@@ -149,7 +184,7 @@ const RescuerDashboard = () => {
 
       const currentCoords = await updateMyRescuerLocation();
       rescuerCoordsRef.current = currentCoords;
-      const snap = await getDocs(collection(db, "users"));
+      const snap = await getDocs(query(collection(db, "users"), where("role", "==", "RESCUER")));
 
       rescuerDocsRef.current = snap.docs.map((userDoc) => ({
         id: userDoc.id,
@@ -386,8 +421,43 @@ const RescuerDashboard = () => {
     <View className="flex-1 bg-[#F5F7FB]">
       <Navbar />
 
+      {/* ================= FLOATING MESSAGES BUTTON ================= */}
+      <View style={{ position: "absolute", top: 110, right: 30, zIndex: 50 }}>
+        <TouchableOpacity
+          onPress={() => router.push("/rescuer/messages")}
+          style={{
+            width: 50,
+            height: 50,
+            borderRadius: 25,
+            backgroundColor: "#0535e3f0",
+            alignItems: "center",
+            justifyContent: "center",
+            shadowColor: "#2563EB",
+            shadowOpacity: 0.4,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 6,
+          }}
+        >
+          <Ionicons name="chatbubbles" size={24} color="#FFFFFF" />
+          {hasUnreadMessages && (
+            <View style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              width: 14,
+              height: 14,
+              backgroundColor: "#EF4444",
+              borderRadius: 7,
+              borderWidth: 2,
+              borderColor: "#5041ffd9",
+            }} />
+          )}
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
-        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: 130, paddingBottom: 40 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={refreshDashboard} colors={["#2563EB"]} />
         }
@@ -395,12 +465,19 @@ const RescuerDashboard = () => {
         <View className="px-5">
 
           {/* ================= HEADER ================= */}
-          <View className="mb-6">
-            <Text className="text-3xl font-black text-gray-900 tracking-tight">
-              Dashboard
-            </Text>
-            <Text className="text-gray-500 mt-1 font-semibold text-sm">
-              Real-time monitoring and emergency management
+          <View className="mb-8 mt-2">
+            <View className="flex-row items-center gap-3 mb-1.5">
+              <View className="w-10 h-10 rounded-full bg-blue-100 border border-blue-200 items-center justify-center shadow-sm">
+                <Ionicons name="grid" size={20} color="#2563EB" />
+              </View>
+              <View>
+                <Text className="text-3xl font-black text-slate-900 tracking-tight">
+                  Dashboard
+                </Text>
+              </View>
+            </View>
+            <Text className="text-slate-500 font-bold text-sm ml-1">
+              Real-time system monitoring & emergency command
             </Text>
           </View>
 
@@ -415,21 +492,87 @@ const RescuerDashboard = () => {
 
           <PredictionCard />
 
+          {/* ================= AI SYSTEM OVERVIEW ================= */}
+          <LinearGradient
+            colors={["#3730A3", "#1E1B4B"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              padding: 20,
+              borderRadius: 28,
+              marginBottom: 24,
+              shadowColor: "#312E81",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.4,
+              shadowRadius: 12,
+              elevation: 10,
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.15)",
+            }}
+          >
+            <View className="flex-row justify-between items-center mb-4">
+              <View className="flex-row items-center gap-3">
+                <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/30">
+                  <MaterialCommunityIcons name="robot-outline" size={22} color="#FFFFFF" />
+                </View>
+                <Text className="text-xl font-black text-white tracking-tight">
+                  RescueBot
+                </Text>
+              </View>
+              {aiSummary && (
+                <View className="bg-indigo-500/80 px-2.5 py-1 rounded-full border border-indigo-400/50 shadow-sm">
+                  <Text className="text-white text-[10px] font-black uppercase tracking-widest">Live</Text>
+                </View>
+              )}
+            </View>
+            
+            <View style={{ backgroundColor: "rgba(255,255,255,0.1)", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "rgba(255,255,255,0.2)" }}>
+              {!aiSummary ? (
+                <View className="flex-row items-center gap-3">
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text className="text-indigo-200 font-bold text-sm italic">
+                    Analyzing global data streams...
+                  </Text>
+                </View>
+              ) : (
+                <Text className="text-white font-semibold text-[15px] leading-relaxed shadow-sm">
+                  {aiSummary}
+                </Text>
+              )}
+            </View>
+          </LinearGradient>
+
           {/* ================= ZONES GRID SECTION ================= */}
-          <View className="mb-6">
-            <View className="flex-row justify-between items-center mb-3">
+          <LinearGradient
+            colors={["#FFFFFF", "#F8FAFC"]}
+            style={{
+              padding: 24,
+              borderRadius: 28,
+              marginBottom: 24,
+              borderWidth: 1,
+              borderColor: "#F1F5F9",
+              shadowColor: "#94A3B8",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              elevation: 4,
+            }}
+          >
+            <View className="flex-row justify-between items-center mb-5 border-b border-slate-100 pb-3">
               <Text className="text-xl font-bold text-gray-900 tracking-tight">
-                Zone Coverage (Global)
+                Zone Coverage
               </Text>
-              <Text className="text-xs text-gray-400 font-bold">
-                {zones.length} {zones.length === 1 ? "Zone" : "Zones"} total
-              </Text>
+              <View className="bg-slate-100 px-3 py-1 rounded-full">
+                <Text className="text-[11px] text-slate-500 font-black uppercase tracking-wider">
+                  {zones.length} Total
+                </Text>
+              </View>
             </View>
 
             {zones.length === 0 ? (
-              <View className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm items-center">
-                <Ionicons name="map-outline" size={40} color="#94A3B8" />
-                <Text className="text-gray-400 font-bold mt-3">No zones available</Text>
+              <View className="bg-white/50 rounded-2xl p-8 border border-slate-100 items-center">
+                <Ionicons name="map-outline" size={40} color="#CBD5E1" />
+                <Text className="text-slate-400 font-bold mt-3 text-sm">No zones available</Text>
               </View>
             ) : (
               <View className="flex-row flex-wrap justify-between">
@@ -445,17 +588,30 @@ const RescuerDashboard = () => {
                         },
                       })
                     }
-                    className="w-[48%] bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100"
+                    style={{
+                      width: "48%",
+                      backgroundColor: "#FFFFFF",
+                      borderRadius: 20,
+                      padding: 16,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: "#F1F5F9",
+                      shadowColor: "#CBD5E1",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 6,
+                      elevation: 2,
+                    }}
                   >
-                    <View className="flex-row items-center justify-between mb-2">
-                      <Text className="font-bold text-sm text-gray-800 flex-1 pr-1" numberOfLines={1}>
+                    <View className="flex-row items-center justify-between mb-3">
+                      <Text className="font-black text-[15px] text-slate-800 flex-1 pr-1" numberOfLines={1}>
                         {zone.name}
                       </Text>
-                      <View className={`w-2 h-2 rounded-full ${getStatusDot(zone.state)}`} />
+                      <View className={`w-2.5 h-2.5 rounded-full shadow-sm ${getStatusDot(zone.state)}`} />
                     </View>
 
-                    <View className={`px-2 py-0.5 rounded-md self-start ${getStatusBg(zone.state)}`}>
-                      <Text className={`text-[9px] font-extrabold tracking-wider text-center ${getStatusText(zone.state)}`}>
+                    <View className={`px-2.5 py-1 rounded-lg self-start border border-black/5 ${getStatusBg(zone.state)}`}>
+                      <Text className={`text-[10px] font-extrabold tracking-wider text-center uppercase ${getStatusText(zone.state)}`}>
                         {zone.state}
                       </Text>
                     </View>
@@ -467,32 +623,62 @@ const RescuerDashboard = () => {
             {zones.length > 6 && (
               <TouchableOpacity
                 onPress={() => setShowAll(!showAll)}
-                className="mt-2 py-2.5 bg-white rounded-2xl border border-gray-200 shadow-sm flex-row items-center justify-center gap-2"
+                style={{
+                  marginTop: 8,
+                  paddingVertical: 12,
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6
+                }}
               >
-                <Text className="text-blue-600 text-sm font-bold">
-                  {showAll ? "Show Less" : "Show More"}
+                <Text className="text-slate-600 text-xs font-black uppercase tracking-wider">
+                  {showAll ? "Collapse List" : "View All Zones"}
                 </Text>
-                <Ionicons name={showAll ? "chevron-up" : "chevron-down"} size={14} color="#2563EB" />
+                <Ionicons name={showAll ? "chevron-up" : "chevron-down"} size={14} color="#475569" />
               </TouchableOpacity>
             )}
-          </View>
+          </LinearGradient>
 
           {/* ================= EMERGENCY SOS RADAR SECTION ================= */}
-          <View className="mb-6 bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-            <View className="flex-row justify-between items-center mb-5 border-b border-gray-50 pb-3">
-              <Text className="text-xl font-bold text-gray-900 tracking-tight">
-                Emergency Dispatch
-              </Text>
+          <LinearGradient
+            colors={["#FFFFFF", "#FEF2F2"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={{
+              padding: 24,
+              borderRadius: 28,
+              marginBottom: 24,
+              borderWidth: 1,
+              borderColor: "#FEE2E2",
+              shadowColor: "#EF4444",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              elevation: 5,
+            }}
+          >
+            <View className="flex-row justify-between items-center mb-5 border-b border-red-100/50 pb-4">
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="radio-outline" size={24} color="#DC2626" />
+                <Text className="text-xl font-black text-gray-900 tracking-tight">
+                  Emergency Dispatch
+                </Text>
+              </View>
 
               <TouchableOpacity
                 onPress={() => router.push("/rescuer/sos")}
-                className="flex-row items-center bg-red-50 border border-red-100 rounded-full px-3 py-1.5"
+                className="flex-row items-center bg-red-100 border border-red-200 rounded-full px-4 py-2 shadow-sm"
               >
                 <Text className="text-red-700 font-extrabold text-xs">
                   View Requests
                 </Text>
                 {activeSosCount > 0 && (
-                  <View className="ml-2 min-w-[18px] h-[18px] rounded-full bg-red-600 items-center justify-center px-1">
+                  <View className="ml-2 min-w-[20px] h-[20px] rounded-full bg-red-600 items-center justify-center px-1 shadow-sm">
                     <Text className="text-white text-[10px] font-black">
                       {activeSosCount}
                     </Text>
@@ -501,59 +687,93 @@ const RescuerDashboard = () => {
               </TouchableOpacity>
             </View>
 
-            <View className="items-center py-4">
-              <View className="w-52 h-52 rounded-full bg-red-50 items-center justify-center border border-red-100 shadow-inner">
-                <View className="w-44 h-44 rounded-full bg-red-100 items-center justify-center">
+            <View className="items-center py-6">
+              <View className="w-56 h-56 rounded-full bg-red-50/80 items-center justify-center border border-red-100 shadow-inner">
+                <View className="w-48 h-48 rounded-full bg-red-100/80 items-center justify-center">
                   <TouchableOpacity
                     onPressIn={handlePressIn}
                     onPressOut={handlePressOut}
                     activeOpacity={0.9}
-                    className="w-36 h-36 bg-red-600 rounded-full items-center justify-center shadow-lg active:bg-red-700"
                     style={{
-                      shadowColor: "#EF4444",
-                      shadowOffset: { width: 0, height: 6 },
-                      shadowOpacity: 0.4,
-                      shadowRadius: 10,
-                      elevation: 8,
+                      shadowColor: "#DC2626",
+                      shadowOffset: { width: 0, height: 10 },
+                      shadowOpacity: 0.5,
+                      shadowRadius: 15,
+                      elevation: 12,
                     }}
                   >
-                    <Ionicons name="alert-circle" size={40} color="white" />
-                    <Text className="text-white text-2xl font-black mt-1 tracking-wider">
-                      SOS
-                    </Text>
+                    <LinearGradient
+                      colors={["#EF4444", "#991B1B"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{
+                        width: 150,
+                        height: 150,
+                        borderRadius: 75,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderWidth: 2,
+                        borderColor: "#FCA5A5",
+                      }}
+                    >
+                      <Ionicons name="alert" size={44} color="white" />
+                      <Text className="text-white text-[28px] font-black mt-1 tracking-widest" style={{ textShadowColor: "rgba(0,0,0,0.3)", textShadowOffset: {width: 0, height: 2}, textShadowRadius: 4 }}>
+                        SOS
+                      </Text>
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               </View>
 
-              <Text className="text-gray-500 mt-5 text-center text-sm font-semibold">
-                Hold button for 3 seconds to broadcast SOS alert
+              <Text className="text-gray-500 mt-6 text-center text-sm font-bold bg-white/50 px-4 py-2 rounded-full border border-gray-100">
+                Hold button for 3 seconds to broadcast SOS
               </Text>
             </View>
-          </View>
+          </LinearGradient>
 
           {/* ================= ACTIVE FLOODS WARNINGS ================= */}
-          <View className="mb-6 bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-            <View className="flex-row justify-between items-center mb-4 border-b border-gray-50 pb-3">
-              <Text className="text-xl font-bold text-gray-900 tracking-tight">
-                Active Flood Signals
-              </Text>
-              <TouchableOpacity onPress={loadFloodHistory}>
-                <Text className="text-blue-600 font-bold text-sm">
-                  View History
+          <LinearGradient
+            colors={["#FFFFFF", "#F0F9FF"]}
+            style={{
+              padding: 24,
+              borderRadius: 28,
+              marginBottom: 24,
+              shadowColor: "#0EA5E9",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              elevation: 4,
+              borderWidth: 1,
+              borderColor: "#E0F2FE",
+            }}
+          >
+            <View className="flex-row justify-between items-center mb-5 border-b border-sky-100/50 pb-4">
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="water-outline" size={24} color="#0284C7" />
+                <Text className="text-xl font-black text-gray-900 tracking-tight">
+                  Active Floods
+                </Text>
+              </View>
+              <TouchableOpacity onPress={loadFloodHistory} className="bg-sky-50 px-3 py-1.5 rounded-full border border-sky-100">
+                <Text className="text-sky-700 font-extrabold text-xs">
+                  History
                 </Text>
               </TouchableOpacity>
             </View>
 
             {activeFloods.length === 0 ? (
-              <View className="items-center py-6">
-                <Ionicons name="shield-checkmark" size={32} color="#10B981" />
-                <Text className="text-gray-400 font-bold mt-2 text-sm">
+              <View className="items-center py-8 bg-white/60 rounded-2xl border border-sky-50">
+                <View className="w-16 h-16 rounded-full bg-green-50 items-center justify-center mb-3">
+                  <Ionicons name="shield-checkmark" size={32} color="#10B981" />
+                </View>
+                <Text className="text-gray-500 font-bold text-[15px]">
                   No active floods detected
                 </Text>
               </View>
             ) : (
               activeFloods.map((flood) => {
                 const reportingCount = flood.reporting_devices_count ?? flood.details?.reporting_devices_count ?? 0;
+                
                 return (
                   <TouchableOpacity
                     key={flood.id}
@@ -561,79 +781,129 @@ const RescuerDashboard = () => {
                       setSelectedFlood(flood);
                       setFloodModalVisible(true);
                     }}
-                    className="py-4 px-4 bg-orange-50 border border-orange-100 rounded-2xl mb-3 flex-row justify-between items-center"
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      borderRadius: 20,
+                      padding: 16,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: "#BAE6FD",
+                      shadowColor: "#38BDF8",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 6,
+                      elevation: 2,
+                    }}
                   >
-                    <View className="flex-1 pr-3">
-                      <View className="flex-row items-center flex-wrap gap-2">
-                        <View className="bg-orange-100 px-2 py-0.5 rounded-md">
-                          <Text className="text-orange-700 text-[9px] font-extrabold uppercase tracking-wider">
-                            Flood Active
-                          </Text>
-                        </View>
-                        <Text className="font-bold text-gray-900 text-base">
+                    <View className="flex-row justify-between items-start mb-3">
+                      <View className="flex-1 pr-2">
+                        <Text className="text-[17px] font-black text-gray-900 tracking-tight mb-1">
                           {flood.zone_name || flood.details?.zone_name || `Zone ${flood.zone_id}`}
                         </Text>
+                        <View className="flex-row items-center gap-1.5">
+                          <Ionicons name="warning" size={14} color="#EA580C" />
+                          <Text className="text-orange-600 font-bold text-xs uppercase tracking-wider">Critical Water Level</Text>
+                        </View>
                       </View>
-                      <Text className="text-xs text-gray-500 mt-2 font-semibold">
-                        📡 Reporting: <Text className="text-gray-800 font-bold">{reportingCount}</Text> {reportingCount === 1 ? "device" : "devices"}
-                      </Text>
+                      
+                      <View className="items-end bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-100">
+                        <Text className="text-sky-900 font-black text-lg">{reportingCount}</Text>
+                        <Text className="text-sky-600 font-bold text-[10px] uppercase">Sensors</Text>
+                      </View>
                     </View>
-                    <View className="w-8 h-8 rounded-full bg-white items-center justify-center border border-orange-100 shadow-sm">
-                      <Ionicons name="chevron-forward" size={16} color="#F97316" />
-                    </View>
+                    
+                    <Text className="text-gray-500 text-xs font-semibold">
+                      Started: {new Date(flood.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </Text>
                   </TouchableOpacity>
                 );
               })
             )}
-          </View>
+          </LinearGradient>
 
           {/* ================= RESCUE NEEDED USERS PANEL ================= */}
-          <View className="mb-6 bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-            <View className="flex-row justify-between items-center mb-5 border-b border-gray-50 pb-3">
-              <Text className="text-xl font-bold text-gray-900 tracking-tight">
-                Rescue Request Feed
-              </Text>
+          <LinearGradient
+            colors={["#FFFFFF", "#FFF1F2"]}
+            style={{
+              padding: 24,
+              borderRadius: 28,
+              marginBottom: 24,
+              borderWidth: 1,
+              borderColor: "#FFE4E6",
+              shadowColor: "#E11D48",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              elevation: 4,
+            }}
+          >
+            <View className="flex-row justify-between items-center mb-5 border-b border-rose-100/50 pb-4">
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="people-circle" size={26} color="#E11D48" />
+                <Text className="text-xl font-black text-gray-900 tracking-tight">
+                  Rescue Requests
+                </Text>
+              </View>
 
-              <TouchableOpacity onPress={loadHistory}>
-                <Text className="text-blue-600 font-bold text-sm">
-                  View History
+              <TouchableOpacity onPress={loadHistory} className="bg-rose-50 px-3 py-1.5 rounded-full border border-rose-100">
+                <Text className="text-rose-700 font-extrabold text-xs">
+                  History
                 </Text>
               </TouchableOpacity>
             </View>
 
             {rescueRequests.length === 0 ? (
-              <View className="items-center py-6">
-                <Ionicons name="people-outline" size={32} color="#94A3B8" />
-                <Text className="text-gray-400 font-bold mt-2 text-sm">
-                  No pending user alerts
+              <View className="items-center py-8 bg-white/60 rounded-2xl border border-rose-50">
+                <View className="w-16 h-16 rounded-full bg-green-50 items-center justify-center mb-3">
+                  <Ionicons name="checkmark-done" size={32} color="#10B981" />
+                </View>
+                <Text className="text-gray-500 font-bold text-[15px]">
+                  No pending alerts
                 </Text>
               </View>
             ) : (
               rescueRequests.map((request) => (
                 <View
                   key={request.id}
-                  className="p-4 bg-red-50 border border-red-100 rounded-2xl mb-4 shadow-sm"
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    borderRadius: 20,
+                    padding: 16,
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: "#FECDD3",
+                    shadowColor: "#F43F5E",
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 6,
+                    elevation: 2,
+                  }}
                 >
                   <View className="flex-row justify-between items-start">
                     <View className="flex-1 pr-3">
-                      <Text className="font-bold text-gray-900 text-base">
+                      <Text className="font-black text-gray-900 text-[17px] mb-1 tracking-tight">
                         {request.user_name || "Unknown User"}
                       </Text>
 
-                      <View className="flex-row items-center mt-1.5 gap-1">
-                        <Ionicons name="warning-outline" size={14} color="#EF4444" />
-                        <Text className="text-xs text-red-600 font-bold">
-                          {request.source === "AUTO" ? "Automatic no-movement SOS" : "Manual SOS"}
+                      <View className="flex-row items-center mt-1 gap-1.5">
+                        <Ionicons name="warning" size={14} color="#E11D48" />
+                        <Text className="text-xs text-rose-600 font-bold uppercase tracking-wider">
+                          {request.source === "AUTO" ? "Auto SOS Triggered" : "Manual SOS Alert"}
                         </Text>
                       </View>
 
-                      <Text className="text-xs text-gray-500 mt-2 font-semibold">
-                        📍 Zone ID: {request.zone_id || "Outside"} | 🕒 {formatTime(request.created_at)}
-                      </Text>
+                      <View className="bg-rose-50/50 p-2.5 rounded-xl mt-3 border border-rose-100/50">
+                        <Text className="text-[11px] text-gray-600 font-bold">
+                          📍 <Text className="text-gray-800">Zone ID: {request.zone_id || "Outside"}</Text>
+                        </Text>
+                        <Text className="text-[11px] text-gray-600 font-bold mt-1">
+                          🕒 <Text className="text-gray-800">Time: {formatTime(request.created_at)}</Text>
+                        </Text>
+                      </View>
                     </View>
 
-                    <View className="bg-red-500 px-3 py-1 rounded-full shadow-sm">
-                      <Text className="text-white text-[9px] font-extrabold tracking-wider">
+                    <View className="bg-rose-600 px-3 py-1.5 rounded-xl shadow-sm border border-rose-500">
+                      <Text className="text-white text-[10px] font-black tracking-widest">
                         ACTIVE
                       </Text>
                     </View>
@@ -642,46 +912,64 @@ const RescuerDashboard = () => {
                   <View className="flex-row mt-4 gap-3">
                     <TouchableOpacity
                       onPress={() => openRescueOnMap(request)}
-                      className="flex-1 bg-blue-600 py-3 rounded-xl shadow-sm flex-row items-center justify-center gap-2"
+                      className="flex-1 bg-slate-800 py-3.5 rounded-xl shadow-sm flex-row items-center justify-center gap-2"
                     >
-                      <Ionicons name="map-outline" size={14} color="white" />
-                      <Text className="text-white text-center text-xs font-extrabold">
-                        View on Map
+                      <Ionicons name="location-sharp" size={16} color="white" />
+                      <Text className="text-white text-center text-xs font-black uppercase tracking-wider">
+                        Locate
                       </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       onPress={() => markRescued(request.id)}
-                      className="flex-1 bg-green-600 py-3 rounded-xl shadow-sm flex-row items-center justify-center gap-2"
+                      className="flex-1 bg-emerald-500 py-3.5 rounded-xl shadow-sm flex-row items-center justify-center gap-2"
                     >
-                      <Ionicons name="checkmark-circle-outline" size={14} color="white" />
-                      <Text className="text-white text-center text-xs font-extrabold">
-                        Rescued
+                      <Ionicons name="checkmark-done-circle" size={18} color="white" />
+                      <Text className="text-white text-center text-xs font-black uppercase tracking-wider">
+                        Mark Safe
                       </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               ))
             )}
-          </View>
+          </LinearGradient>
 
           {/* ================= NEARBY TEAM ROSTER ================= */}
-          <View className="mb-6 bg-white p-5 rounded-3xl shadow-sm border border-gray-100">
-            <View className="flex-row justify-between items-center mb-5 border-b border-gray-50 pb-3">
-              <Text className="text-xl font-bold text-gray-900 tracking-tight">
-                Nearby Team Status
-              </Text>
+          <LinearGradient
+            colors={["#FFFFFF", "#EEF2FF"]}
+            style={{
+              padding: 24,
+              borderRadius: 28,
+              marginBottom: 24,
+              borderWidth: 1,
+              borderColor: "#E0E7FF",
+              shadowColor: "#4F46E5",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              elevation: 4,
+            }}
+          >
+            <View className="flex-row justify-between items-center mb-5 border-b border-indigo-100/50 pb-4">
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="shield-checkmark" size={24} color="#4F46E5" />
+                <Text className="text-xl font-black text-gray-900 tracking-tight">
+                  Team Status
+                </Text>
+              </View>
 
               <TouchableOpacity
                 onPress={loadRescuers}
-                className="w-9 h-9 rounded-full bg-blue-50 items-center justify-center"
+                className="bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100 flex-row items-center gap-1.5"
               >
-                <Ionicons name="refresh" size={18} color="#2563EB" />
+                <Ionicons name="sync" size={14} color="#4338CA" />
+                <Text className="text-indigo-700 font-extrabold text-xs">Sync</Text>
               </TouchableOpacity>
             </View>
 
             {loadingRescuers ? (
-              <ActivityIndicator size="small" color="#2563EB" className="py-6" />
+              <ActivityIndicator size="small" color="#4F46E5" className="py-6" />
             ) : (
               nearbyRescuers.map((r) => {
                 const hasLocation = Boolean(r.location);
@@ -690,38 +978,68 @@ const RescuerDashboard = () => {
                 return (
                   <View
                     key={r.id}
-                    className="py-3 px-4 bg-gray-50 border border-gray-100 rounded-2xl mb-3 flex-row justify-between items-center"
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      borderRadius: 20,
+                      padding: 16,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: "#E0E7FF",
+                      shadowColor: "#6366F1",
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 6,
+                      elevation: 2,
+                    }}
                   >
-                    <View className="flex-1 pr-3">
+                    <View className="flex-row justify-between items-center mb-3">
                       <View className="flex-row items-center gap-2">
-                        <View className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-400"}`} />
-                        <Text className="font-bold text-gray-800 text-sm">
-                          {r.name} {r.isMe ? "(You)" : ""}
-                        </Text>
+                        <View className="w-8 h-8 rounded-full bg-indigo-50 border border-indigo-100 items-center justify-center">
+                          <Ionicons name="person" size={14} color="#4338CA" />
+                        </View>
+                        <View>
+                          <Text className="font-black text-gray-900 text-[15px]">
+                            {r.name} {r.isMe ? <Text className="text-indigo-600">(You)</Text> : ""}
+                          </Text>
+                          <View className="flex-row items-center gap-1.5 mt-0.5">
+                            <View className={`w-2 h-2 rounded-full shadow-sm ${isOnline ? "bg-emerald-500 shadow-emerald-500/50" : "bg-slate-400"}`} />
+                            <Text className={`text-[10px] font-extrabold uppercase tracking-wider ${isOnline ? "text-emerald-600" : "text-slate-500"}`}>
+                              {r.status || "Offline"}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
-
-                      <Text className="text-xs text-gray-500 mt-1 font-semibold">
-                        Status: <Text className="text-gray-800">{r.status}</Text> {r.distanceKm !== null ? `| 📍 ${r.distanceKm.toFixed(2)} km away` : " | No location"}
-                      </Text>
+                      
+                      <View className="items-end bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                        {r.distanceKm !== null ? (
+                          <>
+                            <Text className="text-indigo-900 font-black text-sm">{r.distanceKm.toFixed(2)}</Text>
+                            <Text className="text-indigo-600 font-bold text-[9px] uppercase tracking-wider">KM Away</Text>
+                          </>
+                        ) : (
+                          <Text className="text-indigo-400 font-bold text-[10px] uppercase tracking-wider">No GPS</Text>
+                        )}
+                      </View>
                     </View>
 
                     <TouchableOpacity
                       disabled={!hasLocation}
                       onPress={() => openRescuerOnMap(r)}
-                      className={`px-4 py-2 rounded-xl flex-row items-center gap-2 shadow-sm ${
-                        hasLocation ? "bg-blue-600" : "bg-gray-200"
+                      style={{ opacity: hasLocation ? 1 : 0.6 }}
+                      className={`py-3 rounded-xl flex-row items-center justify-center gap-2 shadow-sm ${
+                        hasLocation ? "bg-indigo-600" : "bg-slate-200"
                       }`}
                     >
-                      <Ionicons name="navigate-outline" size={14} color={hasLocation ? "white" : "#94A3B8"} />
-                      <Text className={`text-xs font-bold ${hasLocation ? "text-white" : "text-gray-400"}`}>
-                        Locate
+                      <Ionicons name="navigate" size={16} color={hasLocation ? "white" : "#64748B"} />
+                      <Text className={`text-xs font-black uppercase tracking-wider ${hasLocation ? "text-white" : "text-slate-500"}`}>
+                        View Live Location
                       </Text>
                     </TouchableOpacity>
                   </View>
                 );
               })
             )}
-          </View>
+          </LinearGradient>
 
         </View>
       </ScrollView>

@@ -2,14 +2,17 @@ export default {
   "expo": {
     "name": "RapidRelief",
     "slug": "rapidrelief",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/Loadingicon.png",
     "scheme": "floodrelief",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "updates": {
-      "url": "https://u.expo.dev/7022772c-67cf-41aa-b702-5daf1abaf04d"
+      "url": "https://u.expo.dev/7022772c-67cf-41aa-b702-5daf1abaf04d",
+      "requestHeaders": {
+        "expo-channel-name": "preview"
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"
@@ -20,6 +23,7 @@ export default {
       "backgroundColor": "#2563EB"
     },
     "android": {
+      "versionCode": 2,
       "config": {
         "googleMaps": {
           "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -46,6 +50,14 @@ export default {
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "ndkVersion": "26.1.10909125"
+          }
+        }
+      ],
       [
         "@config-plugins/react-native-ble-plx",
         {

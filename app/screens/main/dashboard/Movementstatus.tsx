@@ -38,22 +38,22 @@ const MovementStatus = () => {
   };
 
   useEffect(() => {
-  loadZones();
-  getLocation();
-
-  const interval = setInterval(() => {
+    loadZones();
     getLocation();
-  }, 5000);
 
-  const unsubscribe = subscribeToZones((data) => {
-    setZones(data?.zones || []);
-  });
+    const interval = setInterval(() => {
+      getLocation();
+    }, 5000);
 
-  return () => {
-    clearInterval(interval);
-    unsubscribe();
-  };
-}, []);
+    const unsubscribe = subscribeToZones((data) => {
+      setZones(data?.zones || []);
+    });
+
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
+  }, []);
 
   // ---------------- DISTANCE ----------------
   const getDistance = (lat1:number, lon1:number, lat2:number, lon2:number) => {
@@ -155,39 +155,37 @@ const MovementStatus = () => {
 
   // ---------------- PULSE ANIMATION ----------------
   useEffect(() => {
-  let animation: any;
+    let animation: any;
 
-  if (zone) {
-    animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 0.6,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0.3,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-      ])
-    );
+    if (zone) {
+      animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 0.6,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0.3,
+            duration: 900,
+            useNativeDriver: true,
+          }),
+        ])
+      );
 
-    animation.start();
-  } else {
-    // ✅ STOP animation when outside zone
-    glowAnim.stopAnimation();
-    glowAnim.setValue(0); // reset (no glow)
-  }
+      animation.start();
+    } else {
+      glowAnim.stopAnimation();
+      glowAnim.setValue(0);
+    }
 
-  return () => {
-    animation?.stop();
-  };
-}, [zone]);
+    return () => {
+      animation?.stop();
+    };
+  }, [zone]);
 
   // ---------------- UI LOGIC ----------------
   const getUI = () => {
-
     if (!zone) {
       return {
         color: "#00A844",
@@ -235,76 +233,45 @@ const MovementStatus = () => {
   return (
     <Animated.View
       style={{ backgroundColor: ui.color }}
-      className="rounded-[30px] p-6 mb-5 shadow-xl overflow-hidden"
+      className="rounded-[20px] p-4 mb-3 shadow-sm overflow-hidden flex-row items-center justify-between"
     >
-
       {/* Glow Effect */}
       {zone && (
-  <Animated.View
-    pointerEvents="none"
-    style={[
-      StyleSheet.absoluteFillObject,
-      {
-        backgroundColor: "black",
-        opacity: glowAnim.interpolate({
-          inputRange: [0.3, 0.6],
-          outputRange: [0.08, 0.25],
-        }),
-      },
-    ]}
-  />
-)}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFillObject,
+            {
+              backgroundColor: "black",
+              opacity: glowAnim.interpolate({
+                inputRange: [0.3, 0.6],
+                outputRange: [0.08, 0.25],
+              }),
+            },
+          ]}
+        />
+      )}
 
-      {/* Header */}
-      <View className="flex-row justify-between items-center mb-6">
-
-        <View className="flex-row items-center flex-1 min-w-0">
-          <View className="bg-white/20 p-3 rounded-2xl">
-            <Ionicons name="walk-outline" size={28} color="white" />
-          </View>
-
-          <View className="ml-4 flex-1">
-            <Text
-              className="text-white font-bold text-xl"
-              numberOfLines={2}
-            >
-              Movement Status
-            </Text>
-
-            <Text className="text-white/80 text-sm mt-1">
-              Activity Monitoring
-            </Text>
-          </View>
+      <View className="flex-row items-center flex-1 pr-2">
+        <View className="bg-white/20 p-2.5 rounded-full z-10">
+          <Ionicons name="walk-outline" size={24} color="white" />
         </View>
 
-        {/* TRACKING BADGE */}
-        <View
-          style={{ backgroundColor: ui.trackingColor }}
-          className="px-3 py-1 rounded-full ml-2"
-        >
-          <Text className="text-xs font-bold text-black">
-            {ui.trackingLabel}
+        <View className="ml-3 flex-1 z-10">
+          <Text className="text-white font-bold text-[16px]">
+            Movement Status
+          </Text>
+          <Text className="text-white/90 text-[12px] mt-0.5" numberOfLines={1}>
+            {ui.title} • {ui.trackingLabel === 'STANDBY' ? 'Waiting for alerts' : ui.msg}
           </Text>
         </View>
-
       </View>
 
-      {/* Status Box */}
-      <View className="bg-white/20 rounded-2xl p-5 mb-4">
-        <Text className="text-white font-bold text-lg">
-          {ui.title}
-        </Text>
-
-        <Text className="text-white/80 text-sm mt-1">
-          {ui.msg}
+      <View style={{ backgroundColor: ui.trackingColor }} className="px-3 py-1.5 rounded-full z-10">
+        <Text className="text-[10px] font-bold text-black uppercase tracking-wide">
+          {ui.trackingLabel}
         </Text>
       </View>
-
-      {/* Footer */}
-      <Text className="text-white/80 text-[13px] italic">
-        {ui.dc}
-      </Text>
-
     </Animated.View>
   );
 };

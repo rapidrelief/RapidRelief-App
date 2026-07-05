@@ -138,52 +138,27 @@ const Floodstatus = () => {
   const ui = getUI();
 
   return (
-    <View style={{ backgroundColor: ui.color }} className="rounded-[30px] p-6 mb-5 shadow-xl">
-
-      <View className="flex-row justify-between items-start mb-6">
-        <View className="flex-row items-center flex-1">
-          <View className="bg-white/20 p-3 rounded-2xl">
-            <MaterialCommunityIcons name="shield-outline" size={28} color="white" />
-          </View>
-
-          <View className="ml-4 flex-1">
-            <Text className="text-white font-bold text-xl">
-              Flood Status
-            </Text>
-            <Text className="text-blue-100 text-sm mt-1">
-              Current Alert Level
-            </Text>
-          </View>
+    <View style={{ backgroundColor: ui.color }} className="rounded-[20px] p-4 mb-3 flex-row items-center justify-between shadow-sm">
+      <View className="flex-row items-center flex-1 pr-2">
+        <View className="bg-white/20 p-2.5 rounded-full">
+          <MaterialCommunityIcons name="shield-outline" size={24} color="white" />
         </View>
 
-        <View className="bg-white/20 px-4 py-1.5 rounded-full">
-          <Text className="text-white font-bold text-xs uppercase">
-            {ui.label}
+        <View className="ml-3 flex-1">
+          <Text className="text-white font-bold text-[16px]">
+            Flood Status
+          </Text>
+          <Text className="text-white/90 text-[12px] mt-0.5" numberOfLines={1}>
+            {ui.message} • {ui.location}
           </Text>
         </View>
       </View>
 
-      <View className="mb-5">
-        <View className="flex-row items-center mb-3">
-          <Ionicons name="checkmark-circle-outline" size={22} color="white" />
-          <Text className="text-white ml-3 text-base font-medium">
-            {ui.message}
-          </Text>
-        </View>
-
-        <View className="flex-row items-center">
-          <Ionicons name="location-outline" size={22} color="white" />
-          <Text className="text-white ml-3 text-base font-medium">
-            {ui.location}
-          </Text>
-        </View>
+      <View className="bg-white/20 px-3 py-1.5 rounded-full">
+        <Text className="text-white font-bold text-[10px] uppercase tracking-wide">
+          {ui.label}
+        </Text>
       </View>
-
-      <View className="h-[1px] bg-white/20 w-full mb-4" />
-
-      <Text className="text-blue-100 text-xs italic">
-        Live updates enabled
-      </Text>
     </View>
   );
 };

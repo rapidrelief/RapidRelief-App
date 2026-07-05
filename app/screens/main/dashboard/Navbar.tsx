@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  Text,
 } from "react-native";
 
 import { auth, db } from "@/app/config/firebase";
@@ -79,7 +80,7 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
 
   return (
     <>
-      <View className="absolute top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 shadow-sm">
+      <View className="absolute top-0 left-0 right-0 z-50 bg-white/95 border-b border-slate-100 shadow-sm shadow-slate-100 pb-1">
         <View style={{ height: topPadding }} />
 
         <View className="flex-row items-center justify-between px-5 h-16">
@@ -89,28 +90,29 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
             <TouchableOpacity
               onPress={handleOpenDrawer}
               hitSlop={15}
-              className="p-1 mr-3"
+              className="p-2 mr-3 bg-slate-50 rounded-full border border-slate-100"
             >
-              <Feather name="menu" size={24} color="#63564b" />
+              <Feather name="menu" size={20} color="#334155" />
             </TouchableOpacity>
 
-            <View className="bg-blue-600 p-2 rounded-xl shadow-md">
-              <MaterialCommunityIcons name="star" size={20} color="white" />
+            <View className="bg-blue-600 w-9 h-9 rounded-[12px] items-center justify-center shadow-sm shadow-blue-300 border border-blue-500">
+              <MaterialCommunityIcons name="shield-star" size={20} color="white" />
             </View>
+            <Text className="ml-2 font-black text-[17px] text-slate-800 tracking-tighter">RapidRelief</Text>
           </View>
 
           {/* RIGHT */}
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-x-3">
 
             {/* 🔔 NOTIFICATION ICON */}
             <TouchableOpacity
               onPress={() => router.push("/drawer/notification")}
-              className="mr-4 relative p-1"
+              className="relative p-2 bg-slate-50 rounded-full border border-slate-100"
               hitSlop={10}
             >
-              <Ionicons name="notifications-outline" size={24} color="#4B5563" />
+              <Ionicons name="notifications-outline" size={20} color="#334155" />
 
-              {/* ✅ FIX: CONDITIONAL RED DOT */}
+              {/* ✅ CONDITIONAL RED DOT */}
               {hasUnread && (
                 <View className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
               )}
@@ -119,12 +121,12 @@ const Navbar = ({ onMenuPress }: NavbarProps) => {
             {/* 👤 PROFILE */}
             <TouchableOpacity
               onPress={() => setShowProfile(!showProfile)}
-              className={`p-1 rounded-full ${showProfile ? "bg-blue-50" : ""}`}
+              className={`p-2 rounded-full border ${showProfile ? "bg-blue-50 border-blue-200" : "bg-slate-50 border-slate-100"}`}
             >
               <Feather
                 name="user"
-                size={24}
-                color={showProfile ? "#2563EB" : "#4B5563"}
+                size={20}
+                color={showProfile ? "#2563EB" : "#334155"}
               />
             </TouchableOpacity>
           </View>

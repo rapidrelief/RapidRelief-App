@@ -1,4 +1,4 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialIcons } from "@expo/vector-icons";
 import React, { memo } from "react";
 import { Text, View } from "react-native";
 
@@ -6,62 +6,71 @@ const TIPS_DATA = [
   {
     id: 1,
     title: "Stay Informed",
-    desc: "Monitor weather updates and alerts regularly",
+    desc: "Monitor weather updates and alerts regularly.",
+    icon: "radio",
     bgColor: "bg-blue-50",
-    numBg: "bg-blue-600",
+    iconColor: "#2563EB",
   },
   {
     id: 2,
     title: "Emergency Kit",
-    desc: "Keep essentials ready: water, food, flashlight, medicines",
-    bgColor: "bg-yellow-50",
-    numBg: "bg-yellow-600",
+    desc: "Keep essentials: water, food, flashlight, medicines.",
+    icon: "briefcase",
+    bgColor: "bg-amber-50",
+    iconColor: "#D97706",
   },
   {
     id: 3,
     title: "Evacuation Plan",
-    desc: "Know your nearest safe zones and evacuation routes",
-    bgColor: "bg-green-50",
-    numBg: "bg-green-600",
+    desc: "Know your nearest safe zones and routes.",
+    icon: "map",
+    bgColor: "bg-emerald-50",
+    iconColor: "#059669",
   },
   {
     id: 4,
     title: "Share Location",
-    desc: "Enable location sharing with emergency contacts",
+    desc: "Enable location sharing with emergency contacts.",
+    icon: "share-2",
     bgColor: "bg-purple-50",
-    numBg: "bg-purple-600",
+    iconColor: "#7C3AED",
   },
 ];
 
 const SafetyTips = () => {
   return (
-    <View className="bg-white border border-gray-100 rounded-[35px] p-6 mb-10 shadow-sm">
-      <View className="flex-row items-center mb-6">
-        <View className="bg-blue-100 p-2.5 rounded-full">
-          <Feather name="info" size={20} color="#2563EB" />
+    <View className="bg-white rounded-[24px] p-5 mb-10 shadow-sm shadow-slate-200/50 border border-slate-100">
+      <View className="flex-row items-center mb-5">
+        <View className="bg-slate-100 p-2.5 rounded-full mr-3 border border-slate-200/50 shadow-sm">
+          <Feather name="shield" size={18} color="#334155" />
         </View>
-        <Text className="ml-3 text-gray-900 text-xl font-bold">
-          Safety Tips
-        </Text>
+        <View>
+          <Text className="text-slate-800 text-[17px] font-bold">
+            Safety Tips
+          </Text>
+          <Text className="text-slate-500 text-[11px] font-semibold uppercase tracking-wider mt-0.5">
+            Disaster Preparedness
+          </Text>
+        </View>
       </View>
 
-      <View>
+      <View className="gap-y-3">
         {TIPS_DATA.map((tip) => (
           <View
             key={tip.id}
-            className={`${tip.bgColor} p-4 rounded-2xl flex-row items-start border border-white/50 mb-3`}
+            className="bg-white border border-slate-100 p-4 rounded-[16px] flex-row items-center shadow-sm shadow-slate-100"
           >
             <View
-              className={`${tip.numBg} w-6 h-6 rounded-full items-center justify-center mt-0.5`}
+              className={`${tip.bgColor} w-10 h-10 rounded-full items-center justify-center mr-3 shadow-sm`}
             >
-              <Text className="text-white text-[10px] font-bold">{tip.id}</Text>
+              <Feather name={tip.icon as any} size={18} color={tip.iconColor} />
             </View>
 
-            <View className="ml-4 flex-1">
-              <Text className="text-gray-900 font-bold text-base">
+            <View className="flex-1">
+              <Text className="text-slate-800 font-bold text-[14px] mb-0.5">
                 {tip.title}
               </Text>
-              <Text className="text-gray-500 text-sm mt-0.5 leading-5">
+              <Text className="text-slate-500 text-[12px] leading-tight pr-2">
                 {tip.desc}
               </Text>
             </View>

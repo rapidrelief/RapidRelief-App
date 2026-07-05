@@ -33,7 +33,7 @@ const SettingsScreen = ({ onNavigate }: { onNavigate?: (name: string) => void })
         <DangerZone />
 
         <View className="mt-8 mb-4 items-center">
-          <Text className="text-slate-400 text-sm">Version 1.0.1 (OTA Test)</Text>
+          <Text className="text-slate-400 text-sm">Version 1.0.1(official Release)</Text>
         </View>
       </ScrollView>
 

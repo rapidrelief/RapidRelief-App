@@ -50,12 +50,10 @@ const RescuerSOSScreen = () => {
 
     try {
       setClearingZoneId(zoneId);
-
       await clearZoneSOS(zoneId, {
         completed_by: completedBy,
         completed_by_name: completedByName,
       });
-
       await loadActiveSOS();
     } finally {
       setClearingZoneId(null);
@@ -80,179 +78,208 @@ const RescuerSOSScreen = () => {
   }, []);
 
   return (
-    <View className="flex-1 bg-white">
+    <View style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
       <Navbar />
 
       <ScrollView
-        contentContainerStyle={{ paddingTop: 100, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingTop: 130, paddingBottom: 60, paddingHorizontal: 20 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refreshSOS} />
+          <RefreshControl refreshing={refreshing} onRefresh={refreshSOS} colors={["#EF4444"]} />
         }
       >
-        <View className="px-5">
-
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-2xl font-bold">
-              Active SOS
+        <View style={{ marginBottom: 24, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <View>
+            <Text style={{ fontSize: 26, fontWeight: "900", color: "#1E293B", letterSpacing: 0.5 }}>
+              Emergency SOS
             </Text>
-
-            <TouchableOpacity onPress={loadHistory}>
-              <Text className="text-blue-600 font-semibold">
-                View SOS History
-              </Text>
-            </TouchableOpacity>
+            <Text style={{ fontSize: 13, color: "#EF4444", marginTop: 4, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase" }}>
+              Active Incidents
+            </Text>
           </View>
 
-          {refreshing && (
-            <View className="flex-row items-center justify-center bg-blue-50 border border-blue-100 rounded-2xl py-3 mb-5">
-              <ActivityIndicator size="small" color="#2563EB" />
-              <Text className="ml-2 text-blue-700 font-semibold">
-                Refreshing SOS requests...
-              </Text>
-            </View>
-          )}
-
-          {sosItems.length === 0 && (
-            <Text className="text-gray-400 text-center mt-10">
-              No active SOS
+          <TouchableOpacity
+            onPress={loadHistory}
+            style={{ backgroundColor: "rgba(79, 70, 229, 0.1)", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999 }}
+          >
+            <Text style={{ color: "#4F46E5", fontWeight: "800", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              History
             </Text>
-          )}
+          </TouchableOpacity>
+        </View>
 
-          {sosItems.map((sos) =>
-            sos.zone_alert ? (
-              <ZoneAlertCard
-                key={sos.id}
-                alert={sos}
-                onClear={() => clearZoneAlert(Number(sos.zone_id))}
-                clearing={clearingZoneId === Number(sos.zone_id)}
-              />
-            ) : (
-              <View
-                key={sos.id}
-                className="p-4 bg-red-50 border border-red-100 rounded-2xl mb-4 shadow-sm"
-              >
-                <View className="flex-row justify-between items-start">
-                  <View className="flex-1 pr-3">
-                    <Text className="font-bold text-gray-900 text-base">
-                      {sos.user_name || sos.rescuer_name || "Unknown User"}
-                    </Text>
+        {refreshing && (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", backgroundColor: "#EFF6FF", padding: 12, borderRadius: 16, marginBottom: 20 }}>
+            <ActivityIndicator size="small" color="#3B82F6" />
+            <Text style={{ marginLeft: 8, color: "#2563EB", fontWeight: "700" }}>Refreshing incidents...</Text>
+          </View>
+        )}
 
-                    <View className="flex-row items-center mt-1.5 gap-1">
-                      <Ionicons name="warning-outline" size={14} color="#EF4444" />
-                      <Text className="text-xs text-red-600 font-bold">
-                        {sos.source === "AUTO" ? "Automatic/Offline SOS" : "Manual SOS"}
-                      </Text>
-                    </View>
+        {sosItems.length === 0 && floodAlerts.length === 0 && !refreshing && (
+          <View style={{ backgroundColor: "#FFFFFF", padding: 32, borderRadius: 20, borderWidth: 1, borderColor: "#F1F5F9", alignItems: "center", borderStyle: "dashed", marginTop: 20 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(34, 197, 94, 0.1)", justifyContent: "center", alignItems: "center", marginBottom: 16 }}>
+              <Ionicons name="shield-checkmark" size={32} color="#10B981" />
+            </View>
+            <Text style={{ fontSize: 18, fontWeight: "800", color: "#1E293B" }}>All Clear</Text>
+            <Text style={{ color: "#94A3B8", fontWeight: "500", textAlign: "center", marginTop: 8 }}>
+              There are no active emergencies or SOS requests right now.
+            </Text>
+          </View>
+        )}
 
-                    <Text className="text-xs text-gray-500 mt-2 font-semibold">
-                      📍 Zone ID: {sos.zone_id || "Outside"} | 🕒 {new Date(sos.created_at * 1000).toLocaleTimeString()}
+        {sosItems.map((sos) =>
+          sos.zone_alert ? (
+            <ZoneAlertCard
+              key={sos.id}
+              alert={sos}
+              onClear={() => clearZoneAlert(Number(sos.zone_id))}
+              clearing={clearingZoneId === Number(sos.zone_id)}
+            />
+          ) : (
+            <View
+              key={sos.id}
+              style={{
+                backgroundColor: "#FFFFFF",
+                padding: 20,
+                borderRadius: 24,
+                marginBottom: 20,
+                shadowColor: "#EF4444",
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.15,
+                shadowRadius: 16,
+                elevation: 6,
+                borderWidth: 1,
+                borderColor: "rgba(239, 68, 68, 0.2)",
+              }}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+                
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ fontSize: 20, fontWeight: "900", color: "#1E293B" }}>
+                    {sos.user_name || sos.rescuer_name || "Unknown Individual"}
+                  </Text>
+                  
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, backgroundColor: "rgba(239, 68, 68, 0.1)", alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                    <Ionicons name="warning" size={14} color="#EF4444" />
+                    <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "900", marginLeft: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      {sos.source === "AUTO" ? "Automated SOS" : "Manual SOS"}
                     </Text>
                   </View>
 
-                  <View className="bg-red-500 px-3 py-1 rounded-full shadow-sm">
-                    <Text className="text-white text-[9px] font-extrabold tracking-wider">
-                      ACTIVE
-                    </Text>
+                  <View style={{ marginTop: 16 }}>
+                     <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "600", marginBottom: 4 }}>
+                       <Ionicons name="location" size={12} /> Zone ID: <Text style={{ color: "#1E293B", fontWeight: "800" }}>{sos.zone_id || "Global"}</Text>
+                     </Text>
+                     <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "600" }}>
+                       <Ionicons name="time" size={12} /> Time: <Text style={{ color: "#1E293B", fontWeight: "800" }}>{formatTime(sos.created_at)}</Text>
+                     </Text>
                   </View>
                 </View>
 
-                <View className="flex-row mt-4 gap-3">
-                  <TouchableOpacity
-                    onPress={() => {
-                      router.push({
-                        pathname: "/rescuer/map",
-                        params: {
-                          focusLat: sos.lat,
-                          focusLng: sos.lng,
-                          focusType: "user",
-                          focusId: sos.user_id || sos.id,
-                        },
-                      });
-                    }}
-                    className="flex-1 bg-blue-600 py-3 rounded-xl shadow-sm flex-row items-center justify-center gap-2"
-                  >
-                    <Ionicons name="map-outline" size={14} color="white" />
-                    <Text className="text-white text-center text-xs font-extrabold">
-                      View on Map
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={async () => {
-                      await completeSOS(sos.id);
-                      await loadActiveSOS();
-                    }}
-                    className="flex-1 bg-green-600 py-3 rounded-xl shadow-sm flex-row items-center justify-center gap-2"
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={14} color="white" />
-                    <Text className="text-white text-center text-xs font-extrabold">
-                      Mark Safe
-                    </Text>
-                  </TouchableOpacity>
+                <View style={{ backgroundColor: "#EF4444", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, shadowColor: "#EF4444", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: {width: 0, height: 4} }}>
+                  <Text style={{ color: "white", fontSize: 10, fontWeight: "900", tracking: 1, textTransform: "uppercase", letterSpacing: 1 }}>
+                    ACTIVE
+                  </Text>
                 </View>
               </View>
-            )
-          )}
 
-          {floodAlerts.length > 0 && (
-            <View className="mt-6">
-              <Text className="text-xl font-bold mb-3">
-                Active Flood Alerts
-              </Text>
+              <View style={{ flexDirection: "row", marginTop: 24, gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    router.push({
+                      pathname: "/rescuer/map",
+                      params: { sos: JSON.stringify(sos) },
+                    });
+                  }}
+                  style={{ flex: 1, backgroundColor: "#4F46E5", paddingVertical: 14, borderRadius: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", shadowColor: "#4F46E5", shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width:0, height:4} }}
+                >
+                  <Ionicons name="map" size={16} color="white" />
+                  <Text style={{ color: "white", fontWeight: "900", fontSize: 13, marginLeft: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Locate
+                  </Text>
+                </TouchableOpacity>
 
-              {floodAlerts.map((alert) => (
-                <ZoneAlertCard
-                  key={alert.id}
-                  alert={alert}
-                  onClear={() => {}}
-                  clearing={false}
-                />
-              ))}
+                <TouchableOpacity
+                  onPress={async () => {
+                    await completeSOS(sos.id);
+                    await loadActiveSOS();
+                  }}
+                  style={{ flex: 1, backgroundColor: "#10B981", paddingVertical: 14, borderRadius: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", shadowColor: "#10B981", shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width:0, height:4} }}
+                >
+                  <Ionicons name="shield-checkmark" size={16} color="white" />
+                  <Text style={{ color: "white", fontWeight: "900", fontSize: 13, marginLeft: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    Mark Safe
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          )}
+          )
+        )}
 
-        </View>
+        {floodAlerts.length > 0 && (
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: "900", color: "#1E293B", marginBottom: 16 }}>
+              Active Flood Alerts
+            </Text>
+            {floodAlerts.map((alert) => (
+              <ZoneAlertCard
+                key={alert.id}
+                alert={alert}
+                onClear={() => {}}
+                clearing={false}
+              />
+            ))}
+          </View>
+        )}
+
       </ScrollView>
 
+      {/* SOS HISTORY MODAL */}
       <Modal visible={historyVisible} transparent animationType="slide">
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-5 max-h-[80%]">
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-lg font-bold">
+        <View style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.6)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#F8FAFC", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: "85%", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20 }}>
+            
+            <View style={{ width: 40, height: 5, backgroundColor: "#CBD5E1", borderRadius: 3, alignSelf: "center", marginBottom: 20 }} />
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <Text style={{ fontSize: 22, fontWeight: "900", color: "#1E293B" }}>
                 SOS History
               </Text>
-
-              <TouchableOpacity onPress={() => setHistoryVisible(false)}>
-                <Text className="text-red-600 font-bold">Close</Text>
+              <TouchableOpacity onPress={() => setHistoryVisible(false)} style={{ backgroundColor: "rgba(239, 68, 68, 0.1)", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 }}>
+                <Text style={{ color: "#EF4444", fontWeight: "900", fontSize: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>Close</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView>
+            <ScrollView showsVerticalScrollIndicator={false}>
               {history.length === 0 ? (
-                <Text className="text-gray-400 text-center py-8">
-                  No SOS history in the last month
-                </Text>
+                <View style={{ paddingVertical: 40, alignItems: "center" }}>
+                  <Ionicons name="time-outline" size={40} color="#CBD5E1" style={{ marginBottom: 12 }} />
+                  <Text style={{ color: "#94A3B8", fontWeight: "600" }}>No SOS history available.</Text>
+                </View>
               ) : (
                 history.map((sos) => (
                   <View
                     key={sos.id}
-                    className="bg-gray-50 p-4 rounded-2xl mb-3 border border-gray-100"
+                    style={{ backgroundColor: "#FFFFFF", padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: "#E2E8F0" }}
                   >
-                    <Text className="font-bold">
-                      {sos.user_name || sos.rescuer_name || sos.details?.zone_name || "SOS Request"}
-                    </Text>
-
-                    <Text>Zone: {sos.zone_id || "N/A"}</Text>
-                    <Text>Source: {sos.source || "RESCUER"}</Text>
-                    {sos.details && (
-                      <Text>
-                        Devices: {sos.details.active_devices || 0} active / {sos.details.lost_devices || 0} lost / {sos.details.total_devices || 0} total
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                      <Text style={{ fontSize: 16, fontWeight: "800", color: "#1E293B" }}>
+                        {sos.user_name || sos.rescuer_name || sos.details?.zone_name || "SOS Request"}
                       </Text>
-                    )}
-                    <Text>Completed: {formatTime(sos.completed_at)}</Text>
+                      <Text style={{ fontSize: 11, fontWeight: "800", color: "#10B981", textTransform: "uppercase" }}>RESOLVED</Text>
+                    </View>
+                    
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "600" }}>Zone: {sos.zone_id || "N/A"}</Text>
+                      <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "600" }}>Source: {sos.source || "RESCUER"}</Text>
+                    </View>
+                    
+                    <Text style={{ fontSize: 12, color: "#94A3B8", fontWeight: "600", marginTop: 8 }}>
+                      Completed: {formatTime(sos.completed_at)}
+                    </Text>
                   </View>
                 ))
               )}
+              <View style={{ height: 40 }} />
             </ScrollView>
           </View>
         </View>
@@ -263,41 +290,94 @@ const RescuerSOSScreen = () => {
 
 const ZoneAlertCard = ({ alert, onClear, clearing }: any) => {
   const isSos = alert.source === "ZONE_SOS";
-  const label = isSos ? "SOS" : "FLOOD";
+  const label = isSos ? "ZONE SOS" : "FLOOD DETECTED";
+  
+  const bgColor = isSos ? "#FFFFFF" : "#FFFFFF";
+  const borderColor = isSos ? "rgba(239, 68, 68, 0.3)" : "rgba(59, 130, 246, 0.3)";
+  const shadowColor = isSos ? "#EF4444" : "#3B82F6";
+  const iconColor = isSos ? "#EF4444" : "#3B82F6";
+  const iconBg = isSos ? "rgba(239, 68, 68, 0.1)" : "rgba(59, 130, 246, 0.1)";
+  const iconName = isSos ? "warning" : "water";
+
   const reportingNodes = alert.reporting_nodes || alert.details?.reporting_nodes || [];
   const reportingGateways = alert.reporting_gateways || alert.details?.reporting_gateways || [];
 
   return (
     <View
-      className={`p-4 rounded-2xl mb-3 border ${
-        isSos ? "bg-red-50 border-red-200" : "bg-orange-50 border-orange-200"
-      }`}
+      style={{
+        backgroundColor: bgColor,
+        padding: 20,
+        borderRadius: 24,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: borderColor,
+        shadowColor: shadowColor,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 16,
+        elevation: 5,
+      }}
     >
-      <Text className="font-bold text-lg">
-        Zone state changed to {label}
-      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+        <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: iconBg, justifyContent: "center", alignItems: "center", marginRight: 16 }}>
+          <Ionicons name={iconName as any} size={24} color={iconColor} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 18, fontWeight: "900", color: "#1E293B", letterSpacing: 0.5 }}>
+             {label}
+          </Text>
+          <Text style={{ fontSize: 13, fontWeight: "600", color: iconColor, marginTop: 2, textTransform: "uppercase", letterSpacing: 0.5 }}>
+             Zone Critical Alert
+          </Text>
+        </View>
+      </View>
 
-      <Text className="mt-2">Zone: {alert.zone_name || alert.details?.zone_name || alert.zone_id}</Text>
-      <Text>State: {alert.state}</Text>
-      <Text>Time: {formatTime(alert.created_at)}</Text>
-      <Text>Total Devices: {alert.total_devices ?? alert.details?.total_devices ?? 0}</Text>
-      <Text>Active Devices: {alert.active_devices ?? alert.details?.active_devices ?? 0}</Text>
-      <Text>Lost Devices: {alert.lost_devices ?? alert.details?.lost_devices ?? 0}</Text>
-      <Text>
-        Devices reporting {label}: {alert.reporting_devices_count ?? alert.details?.reporting_devices_count ?? 0}
-      </Text>
-      <Text>Node: [{reportingNodes.join(", ")}]</Text>
-      <Text>Gateway: [{reportingGateways.join(", ")}]</Text>
+      <View style={{ backgroundColor: "#F8FAFC", padding: 16, borderRadius: 16, marginBottom: 16 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+          <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "600" }}>Zone Name / ID</Text>
+          <Text style={{ fontSize: 13, color: "#1E293B", fontWeight: "800" }}>{alert.zone_name || alert.details?.zone_name || alert.zone_id}</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+          <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "600" }}>Reported Time</Text>
+          <Text style={{ fontSize: 13, color: "#1E293B", fontWeight: "800" }}>{formatTime(alert.created_at)}</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+          <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "600" }}>Affected Nodes</Text>
+          <Text style={{ fontSize: 13, color: "#1E293B", fontWeight: "800" }}>[{reportingNodes.join(", ")}]</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "600" }}>Affected Gateways</Text>
+          <Text style={{ fontSize: 13, color: "#1E293B", fontWeight: "800" }}>[{reportingGateways.join(", ")}]</Text>
+        </View>
+      </View>
 
       {isSos && (
         <TouchableOpacity
           onPress={onClear}
           disabled={clearing}
-          className="mt-3 bg-green-600 py-2 rounded-xl"
+          style={{
+            backgroundColor: "#10B981",
+            paddingVertical: 14,
+            borderRadius: 16,
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            shadowColor: "#10B981",
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            shadowOffset: {width: 0, height: 4}
+          }}
         >
-          <Text className="text-white text-center font-bold">
-            {clearing ? "Clearing..." : "SOS Clear"}
-          </Text>
+          {clearing ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={18} color="white" style={{ marginRight: 8 }} />
+              <Text style={{ color: "white", fontSize: 14, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Clear Emergency State
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -306,7 +386,8 @@ const ZoneAlertCard = ({ alert, onClear, clearing }: any) => {
 
 const formatTime = (timestamp?: number | null) => {
   if (!timestamp) return "N/A";
-  return new Date(timestamp * 1000).toLocaleString();
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
 export default RescuerSOSScreen;

@@ -7,15 +7,23 @@ import { subscribeToActiveSOS } from '@/app/services/realtimeService';
 
 const Emergency = () => {
   const [isActive, setIsActive] = useState(false);
+  const [sosStartTime, setSosStartTime] = useState<number | null>(null);
 
   useEffect(() => {
     const checkActive = (sosList: any[]) => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
+      
       const userSos = sosList.find(
         (item: any) => item.user_id === uid && item.status === "ACTIVE"
       );
+      
       setIsActive(!!userSos);
+      if (userSos && userSos.created_at) {
+        setSosStartTime(new Date(userSos.created_at).getTime());
+      } else {
+        setSosStartTime(null);
+      }
     };
 
     // Initial fetch
@@ -30,31 +38,30 @@ const Emergency = () => {
   }, []);
 
   return (
-    <View className="bg-white border-2 border-red-50 rounded-[35px] p-6 mb-6 items-center shadow-sm">
-      <View className="flex-row items-center justify-center gap-2 mb-1">
-        <Text className="text-[#1E293B] text-xl font-bold">
+    <View className={`rounded-[24px] p-5 mb-5 items-center shadow-sm border ${isActive ? 'bg-red-50/80 border-red-200 shadow-red-200/50' : 'bg-white border-red-50 shadow-slate-200/40'}`}>
+      <View className="flex-row items-center justify-center gap-2 mb-2">
+        <Text className={`text-lg font-bold tracking-tight ${isActive ? 'text-red-800' : 'text-slate-800'}`}>
           Emergency Assistance
         </Text>
         {isActive && (
-          <View className="bg-red-500 px-2.5 py-0.5 rounded-full">
+          <View className="bg-red-600 px-3 py-1 rounded-full shadow-sm shadow-red-200">
             <Text className="text-white text-[10px] font-black uppercase tracking-wider">
-              Active
+              Live Tracker
             </Text>
           </View>
         )}
       </View>
       
-      <Text className="text-[#64748B] text-center text-[15px] mb-6 px-4">
-        Press the button below if you need immediate help
+      <Text className={`text-center text-[13px] font-medium mb-5 px-4 ${isActive ? 'text-red-700/80' : 'text-slate-500'}`}>
+        {isActive ? "Rescue teams have been alerted." : "Hold the button below if you need immediate help"}
       </Text>
 
-      {/* Scaled down for Dashboard context */}
       <View className="mb-4">
-        <SosButton scale={1} showEmergencyText={false} />
+        <SosButton scale={1} showEmergencyText={false} isActive={isActive} activeStartTime={sosStartTime} />
       </View>
 
-      <Text className="text-[#94A3B8] font-medium text-sm">
-        Hold for 3 seconds to send emergency alert
+      <Text className={`font-bold text-[10px] uppercase tracking-widest ${isActive ? 'text-red-800/60' : 'text-slate-400'}`}>
+        {isActive ? "Stay calm and wait for help" : "Hold for 3s to alert authorities"}
       </Text>
     </View>
   );

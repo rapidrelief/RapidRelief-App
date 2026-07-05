@@ -6,7 +6,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  SafeAreaView
 } from "react-native";
 import Navbar from "../components/RescuerNavbar";
 import { getZoneDeployment, getZonesMap } from "@/app/services/api";
@@ -17,13 +16,13 @@ import { onAuthStateChanged } from "firebase/auth";
 
 const RescuerDeploymentScreen = () => {
   const [orgId, setOrgId] = useState<string | null>(null);
-  
+
   const [orgZones, setOrgZones] = useState<any[]>([]);
   const [globalZones, setGlobalZones] = useState<any[]>([]);
-  
+
   const [selectedOrgZoneId, setSelectedOrgZoneId] = useState<number | null>(null);
   const [orgDeployment, setOrgDeployment] = useState<any>({ gateways: [], nodes: [] });
-  
+
   const [globalDeployments, setGlobalDeployments] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -46,8 +45,7 @@ const RescuerDeploymentScreen = () => {
 
   const loadInitialData = async (uid: string) => {
     setLoading(true);
-    
-    // 1. Get orgId
+
     let currentOrgId = null;
     if (uid) {
       const userDoc = await getDoc(doc(db, "users", uid));
@@ -61,16 +59,15 @@ const RescuerDeploymentScreen = () => {
   };
 
   const fetchZonesAndDeployments = async (currentOrgId: string | null) => {
-    // 2. Get all zones
     const data = await getZonesMap();
     const list = data?.zones || [];
-    
+
     const orgZ = list.filter((z: any) => {
       if (!currentOrgId) return false;
       return String(z.organization_id) === currentOrgId;
     });
     const globZ = list.filter((z: any) => z.organization_id === null || z.organization_id === undefined);
-    
+
     setOrgZones(orgZ);
     setGlobalZones(globZ);
 
@@ -78,7 +75,6 @@ const RescuerDeploymentScreen = () => {
       setSelectedOrgZoneId(orgZ[0].id);
     }
 
-    // 3. Fetch global deployments concurrently
     const gDeps = await Promise.all(
       globZ.map(async (z: any) => {
         const dep = await getZoneDeployment(z.id);
@@ -104,67 +100,85 @@ const RescuerDeploymentScreen = () => {
     setRefreshing(false);
   };
 
-  const selectedOrgZoneName = orgZones.find(z => z.id === selectedOrgZoneId)?.name || "Unknown Zone";
+  const selectedOrgZoneName = orgZones.find((z) => z.id === selectedOrgZoneId)?.name || "Unknown Zone";
 
   const renderDeviceCard = (device: any, isNode: boolean, zoneName: string) => {
     const id = isNode ? device.node_id : device.device_id;
     const title = isNode ? `Node ${id}` : `Gateway ${id}`;
     const icon = isNode ? "pulse" : "wifi";
-    const color = device.status === "ONLINE" ? "#3B82F6" : device.status === "LOST" ? "#F59E0B" : "#EF4444";
     
-    // Gateway-specific or Node-specific subtext
+    let color = "#EF4444";
+    let bgColor = "rgba(239, 68, 68, 0.15)";
+    if (device.status === "ONLINE") {
+      color = "#10B981";
+      bgColor = "rgba(16, 185, 129, 0.15)";
+    } else if (device.status === "LOST") {
+      color = "#F59E0B";
+      bgColor = "rgba(245, 158, 11, 0.15)";
+    }
+
     const subtext = isNode ? `Via Gateway: ${device.gateway_id}` : `Location: Zone Center`;
 
     return (
       <View
         key={id}
         style={{
-          backgroundColor: "white",
-          padding: 16,
-          borderRadius: 12,
-          marginBottom: 8,
-          shadowColor: "#000",
-          shadowOpacity: 0.05,
-          shadowRadius: 5,
-          elevation: 2,
+          backgroundColor: "#FFFFFF",
+          padding: 18,
+          borderRadius: 20,
+          marginBottom: 12,
+          shadowColor: "#94A3B8",
+          shadowOpacity: 0.15,
+          shadowRadius: 10,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 4,
+          borderWidth: 1,
+          borderColor: "#F1F5F9",
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Ionicons name={icon} size={24} color={color} />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={{ fontSize: 16, fontWeight: "bold", color: "#1F2937" }}>
-                {title} <Text style={{ fontSize: 14, fontWeight: "normal", color: "#6B7280" }}>- {zoneName}</Text>
+            <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: bgColor, justifyContent: "center", alignItems: "center", marginRight: 14 }}>
+              <Ionicons name={icon} size={22} color={color} />
+            </View>
+            <View>
+              <Text style={{ fontSize: 16, fontWeight: "900", color: "#1E293B", letterSpacing: 0.5 }}>
+                {title} <Text style={{ fontSize: 13, fontWeight: "600", color: "#94A3B8" }}>- {zoneName}</Text>
               </Text>
-              <Text style={{ fontSize: 12, color: "#6B7280" }}>
+              <Text style={{ fontSize: 12, fontWeight: "500", color: "#64748B", marginTop: 2 }}>
                 {subtext}
               </Text>
             </View>
           </View>
-          <View style={{ backgroundColor: color, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-            <Text style={{ color: "white", fontSize: 10, fontWeight: "bold" }}>{device.status}</Text>
+
+          <View style={{ backgroundColor: bgColor, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+            <Text style={{ color: color, fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 }}>
+              {device.status}
+            </Text>
           </View>
+
         </View>
 
         {/* Alerts Row */}
-        <View style={{ flexDirection: "row", marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: "#F3F4F6", alignItems: "center" }}>
+        <View style={{ flexDirection: "row", marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: "#F1F5F9", alignItems: "center" }}>
           {device.sos && (
-            <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, backgroundColor: "#FEE2E2", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, backgroundColor: "rgba(239, 68, 68, 0.1)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
               <Ionicons name="warning" size={14} color="#EF4444" />
-              <Text style={{ fontSize: 12, color: "#EF4444", fontWeight: "bold", marginLeft: 4 }}>SOS</Text>
+              <Text style={{ fontSize: 11, color: "#EF4444", fontWeight: "900", marginLeft: 6, letterSpacing: 0.5 }}>SOS ALERT</Text>
             </View>
           )}
           {device.flood && (
-            <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, backgroundColor: "#DBEAFE", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, backgroundColor: "rgba(59, 130, 246, 0.1)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
               <Ionicons name="water" size={14} color="#3B82F6" />
-              <Text style={{ fontSize: 12, color: "#3B82F6", fontWeight: "bold", marginLeft: 4 }}>FLOOD</Text>
+              <Text style={{ fontSize: 11, color: "#3B82F6", fontWeight: "900", marginLeft: 6, letterSpacing: 0.5 }}>FLOOD ALERT</Text>
             </View>
           )}
           {isNode && (
-             <View style={{ flexDirection: "row", alignItems: "center", marginLeft: "auto" }}>
+             <View style={{ flexDirection: "row", alignItems: "center", marginLeft: "auto", backgroundColor: device.encrypted ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 }}>
                <Ionicons name={device.encrypted ? "lock-closed" : "lock-open"} size={14} color={device.encrypted ? "#10B981" : "#F59E0B"} />
-               <Text style={{ fontSize: 12, color: device.encrypted ? "#10B981" : "#F59E0B", fontWeight: "500", marginLeft: 4 }}>
-                 {device.encrypted ? "Encrypted" : "Open"}
+               <Text style={{ fontSize: 11, color: device.encrypted ? "#10B981" : "#F59E0B", fontWeight: "800", marginLeft: 6, letterSpacing: 0.5 }}>
+                 {device.encrypted ? "ENCRYPTED" : "OPEN"}
                </Text>
              </View>
           )}
@@ -174,50 +188,55 @@ const RescuerDeploymentScreen = () => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F3F4F6", paddingTop: 100 }}>
-      <Navbar title="Devices" />
+    <View style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
+      <Navbar />
 
       {loading ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color="#4F46E5" />
         </View>
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={{ paddingTop: 130, paddingHorizontal: 20, paddingBottom: 60 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#4F46E5"]} />}
         >
           {/* =========================================================
               SECTION 1: ORGANISATION DEVICES STATUS
           ========================================================= */}
-          <Text style={{ fontSize: 20, fontWeight: "900", color: "#111827", marginBottom: 16, marginTop: 8 }}>
-            Organisation Devices Status
+          <Text style={{ fontSize: 14, fontWeight: "900", color: "#94A3B8", marginBottom: 16, marginTop: 8, textTransform: "uppercase", letterSpacing: 1 }}>
+            Organisation Devices
           </Text>
 
           {orgZones.length === 0 ? (
-            <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 24 }}>No organization zones active.</Text>
+            <Text style={{ color: "#94A3B8", fontStyle: "italic", marginBottom: 24 }}>No organization zones active.</Text>
           ) : (
             <>
               {/* Zone Slider */}
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20, maxHeight: 50 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24, maxHeight: 50 }}>
                 {orgZones.map((z) => (
                   <TouchableOpacity
                     key={z.id}
                     onPress={() => setSelectedOrgZoneId(z.id)}
                     style={{
-                      backgroundColor: selectedOrgZoneId === z.id ? "#2563EB" : "white",
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      borderRadius: 20,
-                      marginRight: 10,
-                      borderWidth: 1,
-                      borderColor: selectedOrgZoneId === z.id ? "#2563EB" : "#D1D5DB",
+                      backgroundColor: selectedOrgZoneId === z.id ? "#4F46E5" : "#FFFFFF",
+                      paddingHorizontal: 20,
+                      paddingVertical: 12,
+                      borderRadius: 999,
+                      marginRight: 12,
+                      shadowColor: selectedOrgZoneId === z.id ? "#4F46E5" : "#64748B",
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: selectedOrgZoneId === z.id ? 0.3 : 0.1,
+                      shadowRadius: 8,
+                      elevation: 4,
                       justifyContent: "center",
                       alignItems: "center",
-                      height: 40
+                      height: 44,
+                      borderWidth: selectedOrgZoneId === z.id ? 0 : 1,
+                      borderColor: "#E2E8F0"
                     }}
                   >
-                    <Text style={{ color: selectedOrgZoneId === z.id ? "white" : "#4B5563", fontWeight: "600" }}>
+                    <Text style={{ color: selectedOrgZoneId === z.id ? "white" : "#475569", fontWeight: "800", letterSpacing: 0.5 }}>
                       {z.name}
                     </Text>
                   </TouchableOpacity>
@@ -226,23 +245,27 @@ const RescuerDeploymentScreen = () => {
 
               {/* Org Gateways */}
               <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: "bold", color: "#374151", marginBottom: 8 }}>
-                  Gateways
+                <Text style={{ fontSize: 13, fontWeight: "800", color: "#64748B", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  <Ionicons name="wifi" size={14} /> Gateways
                 </Text>
                 {orgDeployment?.gateways?.length === 0 ? (
-                  <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 8 }}>No gateways in this zone.</Text>
+                  <View style={{ backgroundColor: "#FFFFFF", padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#F1F5F9", borderStyle: "dashed" }}>
+                     <Text style={{ color: "#94A3B8", fontStyle: "italic", textAlign: "center" }}>No gateways online.</Text>
+                  </View>
                 ) : (
                   orgDeployment.gateways?.map((g: any) => renderDeviceCard(g, false, selectedOrgZoneName))
                 )}
               </View>
 
               {/* Org Nodes */}
-              <View style={{ marginBottom: 32 }}>
-                <Text style={{ fontSize: 16, fontWeight: "bold", color: "#374151", marginBottom: 8 }}>
-                  Nodes
+              <View style={{ marginBottom: 40 }}>
+                <Text style={{ fontSize: 13, fontWeight: "800", color: "#64748B", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  <Ionicons name="pulse" size={14} /> Sensor Nodes
                 </Text>
                 {orgDeployment?.nodes?.length === 0 ? (
-                  <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 8 }}>No nodes in this zone.</Text>
+                   <View style={{ backgroundColor: "#FFFFFF", padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#F1F5F9", borderStyle: "dashed" }}>
+                     <Text style={{ color: "#94A3B8", fontStyle: "italic", textAlign: "center" }}>No nodes online.</Text>
+                   </View>
                 ) : (
                   orgDeployment.nodes?.map((n: any) => renderDeviceCard(n, true, selectedOrgZoneName))
                 )}
@@ -253,31 +276,34 @@ const RescuerDeploymentScreen = () => {
           {/* =========================================================
               SECTION 2: GLOBAL DEVICES STATUS
           ========================================================= */}
-          <Text style={{ fontSize: 20, fontWeight: "900", color: "#111827", marginBottom: 16, marginTop: 16 }}>
-            Global Devices Status
+          <Text style={{ fontSize: 14, fontWeight: "900", color: "#94A3B8", marginBottom: 16, marginTop: 16, textTransform: "uppercase", letterSpacing: 1 }}>
+            Global Operations
           </Text>
 
           {globalDeployments.length === 0 ? (
-            <Text style={{ color: "#6B7280", fontStyle: "italic" }}>No global zones active.</Text>
+            <Text style={{ color: "#94A3B8", fontStyle: "italic" }}>No global zones active.</Text>
           ) : (
             globalDeployments.map((gDep) => (
-              <View key={gDep.zone.id} style={{ backgroundColor: "#E5E7EB", borderRadius: 16, padding: 16, marginBottom: 24 }}>
-                <Text style={{ fontSize: 18, fontWeight: "bold", color: "#1F2937", marginBottom: 12 }}>
-                  {gDep.zone.name}
-                </Text>
+              <View key={gDep.zone.id} style={{ backgroundColor: "#FFFFFF", borderRadius: 20, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: "#E2E8F0", shadowColor: "#94A3B8", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#10B981", marginRight: 8, shadowColor: "#10B981", shadowOpacity: 0.8, shadowRadius: 6, shadowOffset: {width: 0, height:0} }} />
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: "#1E293B", letterSpacing: 0.5 }}>
+                    {gDep.zone.name}
+                  </Text>
+                </View>
 
                 {/* Gateways inside Global Card */}
-                <Text style={{ fontSize: 14, fontWeight: "bold", color: "#4B5563", marginBottom: 8 }}>Gateways</Text>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: "#64748B", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>Gateways</Text>
                 {gDep.gateways?.length === 0 ? (
-                  <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 12, fontSize: 12 }}>No gateways.</Text>
+                  <Text style={{ color: "#94A3B8", fontStyle: "italic", marginBottom: 16, fontSize: 12 }}>None reporting.</Text>
                 ) : (
                   gDep.gateways?.map((g: any) => renderDeviceCard(g, false, gDep.zone.name))
                 )}
 
                 {/* Nodes inside Global Card */}
-                <Text style={{ fontSize: 14, fontWeight: "bold", color: "#4B5563", marginBottom: 8, marginTop: 8 }}>Nodes</Text>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: "#64748B", marginBottom: 10, marginTop: 16, textTransform: "uppercase", letterSpacing: 0.5 }}>Nodes</Text>
                 {gDep.nodes?.length === 0 ? (
-                  <Text style={{ color: "#6B7280", fontStyle: "italic", marginBottom: 12, fontSize: 12 }}>No nodes.</Text>
+                  <Text style={{ color: "#94A3B8", fontStyle: "italic", marginBottom: 8, fontSize: 12 }}>None reporting.</Text>
                 ) : (
                   gDep.nodes?.map((n: any) => renderDeviceCard(n, true, gDep.zone.name))
                 )}
@@ -287,7 +313,7 @@ const RescuerDeploymentScreen = () => {
 
         </ScrollView>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

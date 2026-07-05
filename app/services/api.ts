@@ -238,3 +238,65 @@ export const deleteZone = async (zoneId: number) => {
     return { error: "Could not delete zone" };
   }
 };
+
+import { auth } from "../config/firebase";
+
+const getAuthHeaders = async () => {
+  if (!auth.currentUser) return {};
+  const token = await auth.currentUser.getIdToken();
+  return {
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json"
+  };
+};
+
+export const getMessagesInbox = async () => {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(apiUrl("/api/messages/inbox"), { headers });
+    return await res.json();
+  } catch (err) {
+    console.log("Inbox fetch error:", err);
+    return { messages: [] };
+  }
+};
+
+export const getMessagesSent = async () => {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(apiUrl("/api/messages/sent"), { headers });
+    return await res.json();
+  } catch (err) {
+    console.log("Sent fetch error:", err);
+    return { messages: [] };
+  }
+};
+
+export const sendMessage = async (payload: any) => {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(apiUrl("/api/messages/send"), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  } catch (err) {
+    console.log("Send message error:", err);
+    return { error: "Could not send message" };
+  }
+};
+
+export const markMessageRead = async (messageId: number) => {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(apiUrl(`/api/messages/${messageId}/read`), {
+      method: "POST",
+      headers
+    });
+    return await res.json();
+  } catch (err) {
+    console.log("Mark read error:", err);
+    return { error: "Could not mark as read" };
+  }
+};

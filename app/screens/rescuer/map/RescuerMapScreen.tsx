@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Modal } from "react-native";
 import MapView, { Marker, Circle } from "react-native-maps";
 import { useLocalSearchParams } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import { getZonesMap } from "@/app/services/api";
-import { subscribeToZones } from "@/app/services/realtimeService";
+import { getZonesMap, getZoneDeployment, API_BASE_URL, getActiveSOS } from "@/app/services/api";
+import { subscribeToZones, subscribeToActiveSOS } from "@/app/services/realtimeService";
+import { generateZoneAnalysis } from "@/app/services/aiService";
 import Navbar from "../components/RescuerNavbar";
 
 const RescuerMapScreen = () => {
@@ -25,6 +26,13 @@ const RescuerMapScreen = () => {
   const [userLocation, setUserLocation] = useState<any>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const [aiPrediction, setAiPrediction] = useState<string | null>(null);
+  const [loadingAi, setLoadingAi] = useState(false);
+
+  // SOS List State
+  const [sosList, setSosList] = useState<any[]>([]);
+  const [showSosList, setShowSosList] = useState(false);
+
   // ================= LOCATION =================
   useEffect(() => {
     (async () => {
@@ -43,12 +51,23 @@ const RescuerMapScreen = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // ================= ZONES =================
+  // ================= ZONES & SOS =================
   useEffect(() => {
     loadZones();
-    return subscribeToZones((data) => {
+    loadActiveSOS();
+
+    const unsubZones = subscribeToZones((data) => {
       setZones(data?.zones || []);
     });
+
+    const unsubSOS = subscribeToActiveSOS((data) => {
+      setSosList(data?.sos || []);
+    });
+
+    return () => {
+      unsubZones();
+      unsubSOS();
+    };
   }, []);
 
   const loadZones = async () => {
@@ -60,7 +79,16 @@ const RescuerMapScreen = () => {
     }
   };
 
-  // ================= FIX: SYNC DASHBOARD CLICK =================
+  const loadActiveSOS = async () => {
+    try {
+      const data = await getActiveSOS();
+      setSosList(data?.sos || []);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  // ================= SYNC PARAMS =================
   useEffect(() => {
     if (parsedZone) {
       setSelectedZone(parsedZone);
@@ -68,7 +96,12 @@ const RescuerMapScreen = () => {
       setSelectedRescuer(null);
       focusZone(parsedZone);
     }
-  }, [zone]); // 🔥 THIS IS THE MAIN FIX
+  }, [zone]);
+
+  useEffect(() => {
+    setAiPrediction(null);
+    setLoadingAi(false);
+  }, [selectedZone?.id]);
 
   useEffect(() => {
     if (parsedSOS) {
@@ -165,6 +198,7 @@ const RescuerMapScreen = () => {
     try {
       setRefreshing(true);
       await loadZones();
+      await loadActiveSOS();
     } finally {
       setRefreshing(false);
     }
@@ -179,9 +213,26 @@ const RescuerMapScreen = () => {
     }
   }, [zones]);
 
+  const handleGetAiPrediction = async () => {
+    if (!selectedZone) return;
+    setLoadingAi(true);
+    setAiPrediction(null);
+    try {
+      const mlRes = await fetch(`${API_BASE_URL}/api/prediction/zone/${selectedZone.id}`);
+      const mlData = await mlRes.json();
+      const iotData = await getZoneDeployment(selectedZone.id);
+      const aiResponse = await generateZoneAnalysis(selectedZone, mlData, iotData);
+      setAiPrediction(aiResponse);
+    } catch (err) {
+      console.log("AI Prediction Fetch Error:", err);
+      setAiPrediction("Could not connect to AI services. Please try again.");
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
   const goToMyLocation = () => {
     if (!userLocation || !mapRef.current) return;
-
     mapRef.current.animateToRegion(
       {
         latitude: userLocation.latitude,
@@ -193,9 +244,68 @@ const RescuerMapScreen = () => {
     );
   };
 
+  const onZonePillPress = (z: any) => {
+    setSelectedZone(z);
+    setSelectedSOS(null);
+    setSelectedRescuer(null);
+    setCollapsed(false);
+    focusZone(z);
+  };
+
+  const onSosSelectFromList = (sosItem: any) => {
+    setSelectedSOS(sosItem);
+    setSelectedZone(null);
+    setSelectedRescuer(null);
+    setShowSosList(false);
+    focusSOS(sosItem);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
       <Navbar />
+
+      {/* ================= PREMIUM ZONE SELECTOR ================= */}
+      <View style={{ position: "absolute", top: 110, left: 0, right: 0, zIndex: 10 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+          {zones.map((z) => {
+            const isSelected = selectedZone?.id === z.id;
+            return (
+              <TouchableOpacity
+                key={`pill-${z.id}`}
+                onPress={() => onZonePillPress(z)}
+                style={{
+                  backgroundColor: isSelected ? "#4F46E5" : "rgba(255,255,255,0.95)",
+                  paddingHorizontal: 18,
+                  paddingVertical: 10,
+                  borderRadius: 24,
+                  borderWidth: 1,
+                  borderColor: isSelected ? "#4F46E5" : "#E2E8F0",
+                  shadowColor: isSelected ? "#4F46E5" : "#000",
+                  shadowOpacity: isSelected ? 0.3 : 0.1,
+                  shadowRadius: 5,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: 4,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6
+                }}
+              >
+                <View style={{ 
+                  width: 8, height: 8, borderRadius: 4, 
+                  backgroundColor: z.state === "SAFE" ? "#10B981" : z.state === "FLOOD" ? "#EF4444" : "#F59E0B",
+                  shadowColor: z.state === "SAFE" ? "#10B981" : z.state === "FLOOD" ? "#EF4444" : "#F59E0B",
+                  shadowOpacity: 0.8,
+                  shadowRadius: 4,
+                  shadowOffset: {width: 0, height: 0}
+                }} />
+                <Text style={{ color: isSelected ? "white" : "#0F172A", fontWeight: "800", fontSize: 13, letterSpacing: 0.5 }}>
+                  {z.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {/* ================= MAP ================= */}
       <MapView
@@ -221,11 +331,7 @@ const RescuerMapScreen = () => {
                 key={`marker-${zoneKey}`}
                 coordinate={{ latitude: z.lat, longitude: z.lng }}
                 title={z.name}
-                onPress={() => {
-                  setSelectedZone(z);
-                  setCollapsed(false);
-                  focusZone(z);
-                }}
+                onPress={() => onZonePillPress(z)}
               />
 
               <Circle
@@ -244,28 +350,39 @@ const RescuerMapScreen = () => {
           );
         })}
 
-        {selectedSOS?.lat && selectedSOS?.lng && (
-          <Marker
-            coordinate={{
-              latitude: Number(selectedSOS.lat),
-              longitude: Number(selectedSOS.lng),
-            }}
-            title={selectedSOS.user_name || "Rescue Needed"}
-            description={selectedSOS.source === "AUTO" ? "Automatic SOS" : "Manual SOS"}
-          >
-            <View
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: 11,
-                backgroundColor: "#DC2626",
-                borderWidth: 3,
-                borderColor: "#fff",
-              }}
-            />
-          </Marker>
-        )}
+        {/* SOS MARKERS (All active SOS requests) */}
+        {sosList.map((req) => {
+          if (!req.lat || !req.lng) return null;
+          const isSelectedSOS = selectedSOS?.id === req.id;
+          return (
+            <Marker
+              key={`sos-${req.id}`}
+              coordinate={{ latitude: Number(req.lat), longitude: Number(req.lng) }}
+              title={req.user_name || "Rescue Needed"}
+              description={req.source === "AUTO" ? "Automatic SOS" : "Manual SOS"}
+              onPress={() => onSosSelectFromList(req)}
+              zIndex={isSelectedSOS ? 100 : 10}
+            >
+              <View
+                style={{
+                  width: isSelectedSOS ? 28 : 20,
+                  height: isSelectedSOS ? 28 : 20,
+                  borderRadius: isSelectedSOS ? 14 : 10,
+                  backgroundColor: "#EF4444",
+                  borderWidth: isSelectedSOS ? 4 : 2,
+                  borderColor: "#FFFFFF",
+                  shadowColor: "#EF4444",
+                  shadowOpacity: 0.8,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 0 },
+                  elevation: 5,
+                }}
+              />
+            </Marker>
+          );
+        })}
 
+        {/* Selected Rescuer Marker */}
         {selectedRescuer?.lat && selectedRescuer?.lng && (
           <Marker
             coordinate={{
@@ -274,12 +391,13 @@ const RescuerMapScreen = () => {
             }}
             title={selectedRescuer.name || "Rescuer"}
             description={selectedRescuer.status || "Status unavailable"}
+            zIndex={100}
           >
             <View
               style={{
-                width: 22,
-                height: 22,
-                borderRadius: 11,
+                width: 24,
+                height: 24,
+                borderRadius: 12,
                 backgroundColor: "#2563EB",
                 borderWidth: 3,
                 borderColor: "#fff",
@@ -289,92 +407,113 @@ const RescuerMapScreen = () => {
         )}
       </MapView>
 
-      <TouchableOpacity
-        onPress={refreshMap}
-        disabled={refreshing}
-        style={{
-          position: "absolute",
-          right: 16,
-          top: 110,
-          backgroundColor: "white",
-          padding: 12,
-          borderRadius: 30,
-          shadowColor: "#000",
-          shadowOpacity: 0.2,
-          shadowRadius: 6,
-          elevation: 5,
-        }}
-      >
-        <Ionicons name="refresh" size={22} color={refreshing ? "#94A3B8" : "#2563EB"} />
-      </TouchableOpacity>
-
-      {/* ================= MY LOCATION BUTTON ================= */}
-      <TouchableOpacity
-        onPress={goToMyLocation}
-        style={{
-          position: "absolute",
-          right: 16,
-          bottom: collapsed ? 30 : selectedSOS || selectedRescuer ? 230 : 268,
-          backgroundColor: "white",
-          padding: 12,
-          borderRadius: 30,
-          shadowColor: "#000",
-          shadowOpacity: 0.2,
-          shadowRadius: 6,
-          elevation: 5,
-        }}
-      >
-        <Ionicons name="locate" size={22} color="#2563EB" />
-      </TouchableOpacity>
-
-      {/* ================= BOTTOM PANEL ================= */}
-      {selectedRescuer && (
-        <View
+      {/* ================= RIGHT FLOATING ACTIONS ================= */}
+      <View style={{ position: "absolute", right: 16, top: 180, gap: 16, alignItems: "center", zIndex: 10 }}>
+        
+        {/* Refresh Button */}
+        <TouchableOpacity
+          onPress={refreshMap}
+          disabled={refreshing}
           style={{
-            position: "absolute",
-            bottom: 20,
-            width: "100%",
-            paddingHorizontal: 16,
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+            padding: 14,
+            borderRadius: 30,
+            shadowColor: "#4F46E5",
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 5,
+            borderWidth: 1,
+            borderColor: "#E2E8F0"
           }}
         >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 24,
-              padding: 16,
-              shadowColor: "#000",
-              shadowOpacity: 0.25,
-              shadowRadius: 10,
-              elevation: 6,
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "bold" }}>
+          <Ionicons name="refresh" size={24} color={refreshing ? "#94A3B8" : "#4F46E5"} />
+        </TouchableOpacity>
+
+        {/* Rescue / SOS List Button */}
+        <TouchableOpacity
+          onPress={() => setShowSosList(true)}
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+            padding: 14,
+            borderRadius: 30,
+            shadowColor: "#EF4444",
+            shadowOpacity: 0.2,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 5,
+            borderWidth: 1,
+            borderColor: "rgba(239, 68, 68, 0.2)",
+          }}
+        >
+          <Ionicons name="medkit" size={24} color="#EF4444" />
+          {sosList.length > 0 && (
+            <View style={{
+              position: "absolute",
+              top: -6,
+              right: -6,
+              backgroundColor: "#EF4444",
+              borderRadius: 12,
+              minWidth: 22,
+              height: 22,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingHorizontal: 4,
+              borderWidth: 2,
+              borderColor: "white",
+              shadowColor: "#EF4444",
+              shadowOpacity: 0.5,
+              shadowRadius: 4,
+              shadowOffset: { width: 0, height: 2 }
+            }}>
+              <Text style={{ color: "white", fontSize: 10, fontWeight: "900" }}>{sosList.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* My Location Button */}
+        <TouchableOpacity
+          onPress={goToMyLocation}
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.95)",
+            padding: 14,
+            borderRadius: 30,
+            shadowColor: "#4F46E5",
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 5,
+            borderWidth: 1,
+            borderColor: "#E2E8F0"
+          }}
+        >
+          <Ionicons name="navigate" size={24} color="#4F46E5" />
+        </TouchableOpacity>
+      </View>
+
+      {/* ================= BOTTOM PANELS ================= */}
+      
+      {/* 1. RESCUER CARD */}
+      {selectedRescuer && (
+        <View style={{ position: "absolute", bottom: 40, width: "100%", paddingHorizontal: 16 }}>
+          <View style={{ backgroundColor: "white", borderRadius: 24, padding: 20, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 15, elevation: 8 }}>
+            <Text style={{ fontSize: 20, fontWeight: "900", color: "#1E293B" }}>
               {selectedRescuer.name || "Rescuer"}
             </Text>
-
-            <Text style={{ color: "#6B7280", marginTop: 4 }}>
+            <Text style={{ color: "#64748B", fontWeight: "600", marginTop: 4 }}>
               Status: {selectedRescuer.status || "Unknown"}
             </Text>
-            <Text style={{ marginTop: 10 }}>
+            <Text style={{ color: "#64748B", fontWeight: "600", marginTop: 8 }}>
               Distance: {selectedRescuer.distanceKm !== null && selectedRescuer.distanceKm !== undefined ? `${Number(selectedRescuer.distanceKm).toFixed(2)} km` : "N/A"}
             </Text>
-            <Text>
-              Location: {rescuerAddress}
-            </Text>
-            <Text>
-              Coordinates: {selectedRescuer.lat}, {selectedRescuer.lng}
-            </Text>
+            <Text style={{ color: "#64748B", fontWeight: "600" }}>Location: {rescuerAddress}</Text>
+            <Text style={{ color: "#64748B", fontWeight: "600" }}>Coordinates: {selectedRescuer.lat}, {selectedRescuer.lng}</Text>
 
             <TouchableOpacity
               onPress={() => focusRescuer(selectedRescuer)}
-              style={{
-                marginTop: 12,
-                backgroundColor: "#2563EB",
-                padding: 12,
-                borderRadius: 12,
-              }}
+              style={{ marginTop: 16, backgroundColor: "#2563EB", paddingVertical: 14, borderRadius: 16, alignItems: "center" }}
             >
-              <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
+              <Text style={{ color: "white", fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 }}>
                 Focus Rescuer
               </Text>
             </TouchableOpacity>
@@ -382,311 +521,227 @@ const RescuerMapScreen = () => {
         </View>
       )}
 
+      {/* 2. SOS CARD (Premium Redesign) */}
       {selectedSOS && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: 20,
-            width: "100%",
-            paddingHorizontal: 16,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: "white",
-              borderRadius: 24,
-              padding: 16,
-              shadowColor: "#000",
-              shadowOpacity: 0.25,
-              shadowRadius: 10,
-              elevation: 6,
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "bold" }}>
-              {selectedSOS.user_name || "Unknown User"}
-            </Text>
+        <View style={{ position: "absolute", bottom: 40, width: "100%", paddingHorizontal: 16 }}>
+          <View style={{ backgroundColor: "white", borderRadius: 28, padding: 24, shadowColor: "#EF4444", shadowOpacity: 0.2, shadowRadius: 20, elevation: 10, borderWidth: 1, borderColor: "rgba(239, 68, 68, 0.2)" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 22, fontWeight: "900", color: "#1E293B", letterSpacing: 0.5 }}>
+                  {selectedSOS.user_name || "Unknown User"}
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+                  <Ionicons name="warning" size={14} color="#EF4444" />
+                  <Text style={{ color: "#EF4444", fontWeight: "800", fontSize: 12, marginLeft: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    {selectedSOS.source === "AUTO" ? "Automated SOS" : "Manual SOS"}
+                  </Text>
+                </View>
+              </View>
 
-            <Text style={{ color: "#6B7280", marginTop: 4 }}>
-              {selectedSOS.source === "AUTO" ? "Automatic no-movement SOS" : "Manual SOS"}
-            </Text>
-
-            <View
-              style={{
-                alignSelf: "flex-start",
-                backgroundColor: isLiveLocation(selectedSOS) ? "#DCFCE7" : "#FEF3C7",
-                paddingHorizontal: 10,
-                paddingVertical: 5,
-                borderRadius: 999,
-                marginTop: 10,
-              }}
-            >
-              <Text
-                style={{
-                  color: isLiveLocation(selectedSOS) ? "#166534" : "#92400E",
-                  fontSize: 11,
-                  fontWeight: "bold",
-                }}
+              <TouchableOpacity 
+                onPress={() => setSelectedSOS(null)}
+                style={{ backgroundColor: "#F1F5F9", padding: 8, borderRadius: 16 }}
               >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: isLiveLocation(selectedSOS) ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)", paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, alignSelf: "flex-start", marginBottom: 16 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isLiveLocation(selectedSOS) ? "#10B981" : "#F59E0B", marginRight: 8, shadowColor: isLiveLocation(selectedSOS) ? "#10B981" : "#F59E0B", shadowOpacity: 0.8, shadowRadius: 6, shadowOffset: {width: 0, height: 0} }} />
+              <Text style={{ color: isLiveLocation(selectedSOS) ? "#10B981" : "#F59E0B", fontSize: 11, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 }}>
                 {isLiveLocation(selectedSOS) ? "LIVE LOCATION" : "LAST KNOWN LOCATION"}
               </Text>
             </View>
 
-            <Text style={{ marginTop: 10 }}>
-              Zone: {selectedSOS.zone_id || "Outside zone"}
-            </Text>
-            <Text>
-              Phone: {selectedSOS.user_phone || "N/A"}
-            </Text>
-            <Text>
-              Location Time: {formatTime(selectedSOS.location_updated_at)}
-            </Text>
+            <View style={{ backgroundColor: "#F8FAFC", padding: 16, borderRadius: 16, marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                <Text style={{ color: "#64748B", fontWeight: "600", fontSize: 13 }}>Zone ID</Text>
+                <Text style={{ color: "#1E293B", fontWeight: "800", fontSize: 13 }}>{selectedSOS.zone_id || "Global"}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                <Text style={{ color: "#64748B", fontWeight: "600", fontSize: 13 }}>Phone</Text>
+                <Text style={{ color: "#1E293B", fontWeight: "800", fontSize: 13 }}>{selectedSOS.user_phone || "N/A"}</Text>
+              </View>
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                <Text style={{ color: "#64748B", fontWeight: "600", fontSize: 13 }}>Time</Text>
+                <Text style={{ color: "#1E293B", fontWeight: "800", fontSize: 13 }}>{formatTime(selectedSOS.location_updated_at)}</Text>
+              </View>
+            </View>
 
             {selectedSOS.lat && selectedSOS.lng ? (
               <TouchableOpacity
                 onPress={() => focusSOS(selectedSOS)}
-                style={{
-                  marginTop: 12,
-                  backgroundColor: "#DC2626",
-                  padding: 12,
-                  borderRadius: 12,
-                }}
+                style={{ backgroundColor: "#EF4444", paddingVertical: 14, borderRadius: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", shadowColor: "#EF4444", shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width: 0, height: 4} }}
               >
-                <Text style={{ color: "white", textAlign: "center", fontWeight: "bold" }}>
-                  Focus User
+                <Ionicons name="locate-sharp" size={18} color="white" />
+                <Text style={{ color: "white", textAlign: "center", fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5, marginLeft: 8 }}>
+                  Center Location
                 </Text>
               </TouchableOpacity>
             ) : (
-              <Text style={{ color: "#EF4444", marginTop: 12 }}>
-                No location is available for this SOS request.
-              </Text>
+              <View style={{ backgroundColor: "rgba(239, 68, 68, 0.1)", padding: 12, borderRadius: 12, alignItems: "center" }}>
+                <Text style={{ color: "#EF4444", fontWeight: "700", fontSize: 13 }}>Location data unavailable.</Text>
+              </View>
             )}
           </View>
         </View>
       )}
 
+      {/* 3. ZONE CARD */}
       {!selectedSOS && !selectedRescuer && selectedZone && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: 20,
-            width: "100%",
-            paddingHorizontal: 16,
-          }}
-        >
-          {/* MINIMIZED */}
+        <View style={{ position: "absolute", bottom: 40, width: "100%", paddingHorizontal: 16 }}>
+          {/* ... (Existing Zone Card remains the same visually, but will be closed properly when SOS or Rescuer is active because of the condition above) ... */}
           {collapsed ? (
-            <View
-              style={{
-                flexDirection: "row",
-                alignSelf: "center",
-                alignItems: "center",
-                backgroundColor: "white",
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: 30,
-                shadowColor: "#000",
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-                elevation: 5,
-              }}
+            <TouchableOpacity
+              onPress={() => setCollapsed(false)}
+              style={{ flexDirection: "row", alignSelf: "center", alignItems: "center", backgroundColor: "white", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 999, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 10, shadowOffset: {width: 0, height: 4}, elevation: 5 }}
             >
-              <Text style={{ fontWeight: "700", marginRight: 10 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selectedZone.state === "SAFE" ? "#10B981" : selectedZone.state === "FLOOD" ? "#EF4444" : "#F59E0B", marginRight: 8 }} />
+              <Text style={{ fontWeight: "800", color: "#1E293B", marginRight: 12, letterSpacing: 0.5 }}>
                 {selectedZone.name}
               </Text>
-
-              <TouchableOpacity onPress={() => setCollapsed(false)}>
-                <Ionicons name="expand" size={20} color="#111" />
-              </TouchableOpacity>
-            </View>
+              <Ionicons name="chevron-up" size={16} color="#64748B" />
+            </TouchableOpacity>
           ) : (
-            /* FULL CARD */
-            <View
-              style={{
-                backgroundColor: "white",
-                borderRadius: 28,
-                padding: 20,
-                shadowColor: "#000",
-                shadowOpacity: 0.15,
-                shadowRadius: 15,
-                elevation: 8,
-                borderWidth: 1,
-                borderColor: "#F1F5F9",
-              }}
-            >
-              {/* Card Header */}
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+            <View style={{ backgroundColor: "white", borderRadius: 28, padding: 24, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, elevation: 8, borderWidth: 1, borderColor: "#F1F5F9" }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
                 <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={{ fontSize: 20, fontWeight: "900", color: "#0F172A" }}>
+                  <Text style={{ fontSize: 22, fontWeight: "900", color: "#1E293B", letterSpacing: 0.5 }}>
                     {selectedZone.name}
                   </Text>
-                  <Text style={{ color: "#64748B", fontSize: 13, marginTop: 2 }}>
-                    Geofenced Monitoring Zone
-                  </Text>
                 </View>
-                
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <TouchableOpacity 
-                    onPress={() => setCollapsed(true)}
-                    style={{
-                      backgroundColor: "#F8FAFC",
-                      padding: 6,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: "#E2E8F0"
-                    }}
-                  >
-                    <Ionicons name="contract-outline" size={18} color="#475569" />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity onPress={() => setCollapsed(true)} style={{ backgroundColor: "#F1F5F9", padding: 8, borderRadius: 16 }}>
+                  <Ionicons name="chevron-down" size={20} color="#64748B" />
+                </TouchableOpacity>
               </View>
 
-              {/* Status Badge & Size Info */}
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-                <View 
-                  style={{
-                    backgroundColor: 
-                      selectedZone.state === "SAFE" ? "#DCFCE7" :
-                      selectedZone.state === "FLOOD" || selectedZone.state === "SOS" ? "#FEE2E2" :
-                      selectedZone.state === "WARNING" ? "#FFEDD5" :
-                      selectedZone.state === "LOST" ? "#FEF3C7" : "#F1F5F9",
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 999,
-                  }}
-                >
-                  <Text 
-                    style={{
-                      color: 
-                        selectedZone.state === "SAFE" ? "#15803D" :
-                        selectedZone.state === "FLOOD" || selectedZone.state === "SOS" ? "#B91C1C" :
-                        selectedZone.state === "WARNING" ? "#C2410C" :
-                        selectedZone.state === "LOST" ? "#B45309" : "#475569",
-                      fontSize: 11,
-                      fontWeight: "800",
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {selectedZone.state === "SAFE" ? "🟢 SAFE" :
-                     selectedZone.state === "FLOOD" ? "🚨 FLOOD RISK" :
-                     selectedZone.state === "SOS" ? "🆘 SOS ACTIVE" :
-                     selectedZone.state === "WARNING" ? "⚠️ WARNING" :
-                     selectedZone.state === "LOST" ? "⚠️ LOST" : `📡 ${selectedZone.state}`}
+                <View style={{ backgroundColor: selectedZone.state === "SAFE" ? "rgba(16, 185, 129, 0.1)" : selectedZone.state === "FLOOD" || selectedZone.state === "SOS" ? "rgba(239, 68, 68, 0.1)" : "rgba(245, 158, 11, 0.1)", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+                  <Text style={{ color: selectedZone.state === "SAFE" ? "#10B981" : selectedZone.state === "FLOOD" || selectedZone.state === "SOS" ? "#EF4444" : "#F59E0B", fontSize: 11, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    {selectedZone.state === "SAFE" ? "🟢 SAFE" : selectedZone.state === "FLOOD" ? "🚨 FLOOD RISK" : selectedZone.state === "SOS" ? "🆘 SOS ACTIVE" : `⚠️ ${selectedZone.state}`}
                   </Text>
                 </View>
-
-                <View style={{ backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 }}>
-                  <Text style={{ color: "#475569", fontSize: 11, fontWeight: "700" }}>
+                <View style={{ backgroundColor: "#F8FAFC", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
+                  <Text style={{ color: "#64748B", fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.5 }}>
                     📍 Radius: {selectedZone.radius_m}m
                   </Text>
                 </View>
               </View>
 
-              {/* Metrics Grid */}
-              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 18, gap: 10 }}>
-                {/* Active Devices */}
-                <View 
-                  style={{
-                    flex: 1,
-                    backgroundColor: "#F8FAFC",
-                    borderWidth: 1,
-                    borderColor: "#E2E8F0",
-                    borderRadius: 16,
-                    padding: 12,
-                    alignItems: "center"
-                  }}
-                >
-                  <Ionicons name="hardware-chip-outline" size={20} color="#2563EB" />
-                  <Text style={{ fontSize: 18, fontWeight: "800", color: "#0F172A", marginTop: 4 }}>
-                    {selectedZone.devices ?? selectedZone.total_devices ?? 0}
-                  </Text>
-                  <Text style={{ fontSize: 10, fontWeight: "600", color: "#64748B", marginTop: 2, textAlign: "center" }}>
-                    Total Devices
-                  </Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16, gap: 12 }}>
+                <View style={{ flex: 1, backgroundColor: "#F8FAFC", borderRadius: 16, padding: 12 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <Ionicons name="hardware-chip" size={14} color="#4F46E5" />
+                    <Text style={{ fontSize: 12, fontWeight: "800", color: "#64748B", textTransform: "uppercase" }}>Total</Text>
+                  </View>
+                  <Text style={{ fontSize: 20, fontWeight: "900", color: "#1E293B" }}>{selectedZone.devices ?? selectedZone.total_devices ?? 0}</Text>
                 </View>
-
-                {/* Lost Devices */}
-                <View 
-                  style={{
-                    flex: 1,
-                    backgroundColor: (selectedZone.lostDevices ?? selectedZone.lost_devices ?? 0) > 0 ? "#FDF2F2" : "#F8FAFC",
-                    borderWidth: 1,
-                    borderColor: (selectedZone.lostDevices ?? selectedZone.lost_devices ?? 0) > 0 ? "#FDE8E8" : "#E2E8F0",
-                    borderRadius: 16,
-                    padding: 12,
-                    alignItems: "center"
-                  }}
-                >
-                  <Ionicons 
-                    name="warning-outline" 
-                    size={20} 
-                    color={(selectedZone.lostDevices ?? selectedZone.lost_devices ?? 0) > 0 ? "#EF4444" : "#64748B"} 
-                  />
-                  <Text 
-                    style={{ 
-                      fontSize: 18, 
-                      fontWeight: "800", 
-                      color: (selectedZone.lostDevices ?? selectedZone.lost_devices ?? 0) > 0 ? "#EF4444" : "#0F172A", 
-                      marginTop: 4 
-                    }}
-                  >
+                <View style={{ flex: 1, backgroundColor: (selectedZone.lostDevices ?? selectedZone.lost_devices ?? 0) > 0 ? "rgba(239, 68, 68, 0.05)" : "#F8FAFC", borderRadius: 16, padding: 12 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                    <Ionicons name="warning" size={14} color={(selectedZone.lostDevices ?? selectedZone.lost_devices ?? 0) > 0 ? "#EF4444" : "#64748B"} />
+                    <Text style={{ fontSize: 12, fontWeight: "800", color: "#64748B", textTransform: "uppercase" }}>Lost</Text>
+                  </View>
+                  <Text style={{ fontSize: 20, fontWeight: "900", color: (selectedZone.lostDevices ?? selectedZone.lost_devices ?? 0) > 0 ? "#EF4444" : "#1E293B" }}>
                     {selectedZone.lostDevices ?? selectedZone.lost_devices ?? 0}
                   </Text>
-                  <Text style={{ fontSize: 10, fontWeight: "600", color: "#64748B", marginTop: 2, textAlign: "center" }}>
-                    Lost Signal
-                  </Text>
                 </View>
               </View>
 
-              {/* State Explanation Banner */}
-              <View 
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: "#F8FAFC",
-                  borderWidth: 1,
-                  borderColor: "#E2E8F0",
-                  borderRadius: 16,
-                  padding: 12,
-                  marginBottom: 18,
-                }}
-              >
-                <Ionicons name="information-circle-outline" size={20} color="#2563EB" style={{ marginRight: 8 }} />
-                <Text style={{ fontSize: 12, color: "#475569", flex: 1, fontWeight: "600", lineHeight: 17 }}>
-                  {selectedZone.state === "SAFE" ? "Zone is safe" :
-                   selectedZone.state === "FLOOD" ? "Zone reporting flood" :
-                   selectedZone.state === "SOS" ? "Zone reporting SOS might be possible disaster" :
-                   selectedZone.state === "LOST" ? "Zone lost contact might be possible flood or other natural disaster" :
-                   selectedZone.state === "NO_SIGNAL" ? "No devices in zone" : `Status: ${selectedZone.state}`}
-                </Text>
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <TouchableOpacity onPress={() => focusZone(selectedZone)} style={{ flex: 1, backgroundColor: "#4F46E5", borderRadius: 16, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", shadowColor: "#4F46E5", shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width: 0, height: 4} }}>
+                  <Ionicons name="locate-outline" size={18} color="white" />
+                  <Text style={{ color: "white", textAlign: "center", fontWeight: "900", fontSize: 13, marginLeft: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>Focus</Text>
+                </TouchableOpacity>
+
+                {!aiPrediction && !loadingAi && (
+                  <TouchableOpacity onPress={handleGetAiPrediction} style={{ flex: 1, backgroundColor: "#0F172A", borderRadius: 16, paddingVertical: 14, flexDirection: "row", justifyContent: "center", alignItems: "center", shadowColor: "#0F172A", shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: {width: 0, height: 4} }}>
+                    <MaterialCommunityIcons name="robot-outline" size={18} color="white" />
+                    <Text style={{ color: "white", textAlign: "center", fontWeight: "900", fontSize: 13, marginLeft: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>RescueBot</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
-              {/* Action Button */}
-              <TouchableOpacity
-                onPress={() => focusZone(selectedZone)}
-                style={{
-                  backgroundColor: "#2563EB",
-                  borderRadius: 16,
-                  paddingVertical: 14,
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  shadowColor: "#2563EB",
-                  shadowOpacity: 0.25,
-                  shadowRadius: 8,
-                  shadowOffset: { width: 0, height: 4 },
-                  elevation: 4,
-                }}
-              >
-                <Ionicons name="navigate-circle-outline" size={20} color="white" />
-                <Text style={{ color: "white", textAlign: "center", fontWeight: "800", fontSize: 15, marginLeft: 6 }}>
-                  Focus Zone on Map
-                </Text>
-              </TouchableOpacity>
+              {loadingAi && (
+                <View style={{ marginTop: 16, backgroundColor: "#EEF2FF", padding: 16, borderRadius: 16, alignItems: "center", flexDirection: "row", justifyContent: "center", gap: 12 }}>
+                  <ActivityIndicator size="small" color="#4F46E5" />
+                  <Text style={{ color: "#4F46E5", fontWeight: "800", fontSize: 13 }}>RescueBot is analyzing zone...</Text>
+                </View>
+              )}
+
+              {aiPrediction && !loadingAi && (
+                <View style={{ marginTop: 16, backgroundColor: "#EEF2FF", padding: 16, borderRadius: 16, borderWidth: 1, borderColor: "#C7D2FE" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                    <View style={{ backgroundColor: "#4F46E5", padding: 6, borderRadius: 8 }}>
+                      <MaterialCommunityIcons name="robot-outline" size={16} color="white" />
+                    </View>
+                    <Text style={{ color: "#312E81", fontWeight: "900", fontSize: 14, letterSpacing: 0.5 }}>RescueBot Analysis</Text>
+                  </View>
+                  <Text style={{ color: "#3730A3", lineHeight: 20, fontSize: 13, fontWeight: "600" }}>{aiPrediction}</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
       )}
+
+      {/* ================= ACTIVE SOS REQUESTS MODAL ================= */}
+      <Modal visible={showSosList} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.6)", justifyContent: "flex-end" }}>
+          <View style={{ backgroundColor: "#F8FAFC", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 24, maxHeight: "80%", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20 }}>
+            
+            <View style={{ width: 40, height: 5, backgroundColor: "#CBD5E1", borderRadius: 3, alignSelf: "center", marginBottom: 20 }} />
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <View>
+                <Text style={{ fontSize: 22, fontWeight: "900", color: "#1E293B" }}>Active Rescues</Text>
+                <Text style={{ fontSize: 13, color: "#EF4444", fontWeight: "800", marginTop: 4 }}>{sosList.length} Immediate action required</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowSosList(false)} style={{ backgroundColor: "rgba(100, 116, 139, 0.1)", padding: 8, borderRadius: 999 }}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {sosList.length === 0 ? (
+                <View style={{ paddingVertical: 40, alignItems: "center" }}>
+                  <Ionicons name="shield-checkmark" size={48} color="#10B981" style={{ marginBottom: 16 }} />
+                  <Text style={{ color: "#10B981", fontWeight: "900", fontSize: 18 }}>All Clear</Text>
+                  <Text style={{ color: "#64748B", fontWeight: "600", marginTop: 8 }}>There are no active SOS requests right now.</Text>
+                </View>
+              ) : (
+                sosList.map((sosItem) => (
+                  <TouchableOpacity
+                    key={`modal-sos-${sosItem.id}`}
+                    onPress={() => onSosSelectFromList(sosItem)}
+                    style={{ backgroundColor: "#FFFFFF", padding: 16, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: "rgba(239, 68, 68, 0.2)", shadowColor: "#EF4444", shadowOpacity: 0.1, shadowRadius: 8, shadowOffset: {width: 0, height: 4}, elevation: 3 }}
+                  >
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
+                      <Text style={{ fontSize: 18, fontWeight: "900", color: "#1E293B" }}>
+                        {sosItem.user_name || "Unknown User"}
+                      </Text>
+                      <View style={{ backgroundColor: "#EF4444", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                        <Text style={{ fontSize: 10, fontWeight: "900", color: "white", textTransform: "uppercase" }}>ACTIVE</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                      <Ionicons name="warning" size={14} color="#EF4444" style={{ marginRight: 6 }} />
+                      <Text style={{ fontSize: 13, color: "#EF4444", fontWeight: "800" }}>{sosItem.source === "AUTO" ? "Automated SOS" : "Manual SOS"}</Text>
+                    </View>
+                    
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "600" }}>Zone: {sosItem.zone_id || "Global"}</Text>
+                      <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "600" }}>{formatTime(sosItem.created_at)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -700,7 +755,8 @@ const isLiveLocation = (request: any) => {
 
 const formatTime = (timestamp?: number | null) => {
   if (!timestamp) return "N/A";
-  return new Date(timestamp * 1000).toLocaleString();
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 };
 
 export default RescuerMapScreen;

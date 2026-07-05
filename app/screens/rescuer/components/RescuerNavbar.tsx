@@ -11,9 +11,13 @@ import { useNavigation } from "@react-navigation/native";
 import { router } from "expo-router";
 import { subscribeToZones } from "@/app/services/realtimeService";
 import * as Location from "expo-location";
+import { LinearGradient } from "expo-linear-gradient";
+
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const RescuerNavbar = () => {
   const navigation: any = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const [zones, setZones] = useState<any[]>([]);
   const [currentZone, setCurrentZone] = useState<any>(null);
@@ -165,29 +169,40 @@ const RescuerNavbar = () => {
     <View
       style={{
         position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
+        top: Math.max(insets.top + 10, 45),
+        left: 20,
+        right: 20,
         zIndex: 50,
-        backgroundColor: "white",
-        paddingHorizontal: 16,
-        paddingTop: 48,
-        paddingBottom: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        shadowColor: "#000",
-        shadowOpacity: 0.1,
-        elevation: 5,
+        shadowColor: "#1E1B4B",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.4,
+        shadowRadius: 15,
+        elevation: 12,
       }}
     >
+      <LinearGradient
+        colors={["rgba(55, 48, 163, 0.95)", "rgba(30, 27, 75, 0.95)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderRadius: 999,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderWidth: 1,
+          borderColor: "rgba(255, 255, 255, 0.15)",
+          overflow: "hidden",
+        }}
+      >
       {/* LEFT */}
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <TouchableOpacity onPress={() => navigation.openDrawer()}>
-          <Ionicons name="menu" size={26} color="#111" />
+          <Ionicons name="menu" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        <Text style={{ marginLeft: 10, fontSize: 16, fontWeight: "700" }}>
+        <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "800", color: "#FFFFFF", letterSpacing: 0.5 }}>
           Rescuer Portal
         </Text>
       </View>
@@ -198,16 +213,16 @@ const RescuerNavbar = () => {
         style={{
           flexDirection: "row",
           alignItems: "center",
-          backgroundColor: "#fff",
-          paddingHorizontal: 10,
-          paddingVertical: 5,
+          backgroundColor: "rgba(255, 255, 255, 0.15)",
+          paddingHorizontal: 12,
+          paddingVertical: 6,
           borderRadius: 999,
           borderWidth: 1,
           borderColor: status.color,
           shadowColor: status.color,
-          shadowOpacity: 0.25,
-          shadowRadius: 6,
-          elevation: 3,
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+          elevation: 4,
         }}
       >
         {/* DOT */}
@@ -218,15 +233,20 @@ const RescuerNavbar = () => {
             borderRadius: 4,
             backgroundColor: status.color,
             marginRight: 6,
+            shadowColor: status.color,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.8,
+            shadowRadius: 4,
           }}
         />
 
         <Text
           style={{
-            fontSize: 11,
-            fontWeight: "700",
-            color: "#111",
+            fontSize: 10,
+            fontWeight: "800",
+            color: "#FFFFFF",
             textTransform: "uppercase",
+            letterSpacing: 1,
           }}
         >
           {status.label}
@@ -237,15 +257,17 @@ const RescuerNavbar = () => {
       <TouchableOpacity
         onPress={() => router.push("/rescuer/profile")}
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 10,
-          backgroundColor: "#F3F4F6",
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          backgroundColor: "rgba(255, 255, 255, 0.15)",
           justifyContent: "center",
           alignItems: "center",
+          borderWidth: 1,
+          borderColor: "rgba(255, 255, 255, 0.2)",
         }}
       >
-        <Ionicons name="person" size={20} color="#111" />
+        <Ionicons name="person" size={18} color="#FFFFFF" />
       </TouchableOpacity>
 
       {/* ================= MODAL ================= */}
@@ -308,6 +330,7 @@ const RescuerNavbar = () => {
           </View>
         </View>
       </Modal>
+      </LinearGradient>
     </View>
   );
 };
