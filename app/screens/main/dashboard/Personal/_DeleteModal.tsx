@@ -31,7 +31,7 @@ const DeleteModal = ({ isVisible, onClose }: { isVisible: boolean, onClose: () =
 
       await reauthenticateWithCredential(user, credential);
 
-      await deleteDoc(doc(db, "user", user.uid));
+      await deleteDoc(doc(db, "users", user.uid));
 
       await deleteUser(user);
 
