@@ -2,7 +2,7 @@ export default {
   "expo": {
     "name": "RapidRelief",
     "slug": "rapidrelief",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/Loadingicon.png",
     "scheme": "floodrelief",
@@ -23,7 +23,7 @@ export default {
       "backgroundColor": "#2563EB"
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 3,
       "config": {
         "googleMaps": {
           "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
