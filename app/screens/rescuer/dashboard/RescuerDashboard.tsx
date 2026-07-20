@@ -135,7 +135,7 @@ const RescuerDashboard = () => {
         rescuerCoordsRef.current = await updateMyRescuerLocation();
 
         unsubscribe = onSnapshot(
-          query(collection(db, "users"), where("role", "==", "RESCUER")),
+          query(collection(db, "users"), where("role", "in", ["RESCUER", "rescuer"])),
           (snap) => {
             rescuerDocsRef.current = snap.docs.map((userDoc) => ({
               id: userDoc.id,
@@ -184,7 +184,7 @@ const RescuerDashboard = () => {
 
       const currentCoords = await updateMyRescuerLocation();
       rescuerCoordsRef.current = currentCoords;
-      const snap = await getDocs(query(collection(db, "users"), where("role", "==", "RESCUER")));
+      const snap = await getDocs(query(collection(db, "users"), where("role", "in", ["RESCUER", "rescuer"])));
 
       rescuerDocsRef.current = snap.docs.map((userDoc) => ({
         id: userDoc.id,
